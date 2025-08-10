@@ -1,0 +1,15 @@
+{
+  "buildCommand": "cd Client && npm run build",
+  "outputDirectory": "Client/dist",
+  "installCommand": "cd Client && npm install",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://linknuke-backend.fly.dev/api/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
