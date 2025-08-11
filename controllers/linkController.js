@@ -10,14 +10,11 @@ const paddle = require("@paddle/paddle-node-sdk");
 dayjs.extend(customParseFormat);
 
 // Initialize Paddle SDK
-const vendorId = process.env.PADDLE_VENDOR_ID;
-const apiKey = process.env.PADDLE_API_KEY;
 const isSandbox = process.env.PADDLE_ENV === "sandbox";
 
-const paddleClient = new paddle.Client({
-  vendorId: vendorId,
-  apiKey: apiKey,
-  sandbox: isSandbox,
+const paddleClient = new paddle.Paddle({
+  environment: isSandbox ? "sandbox" : "production",
+  apiKey: process.env.PADDLE_API_KEY,
 });
 
 const Link = require("../models/Link.js");
