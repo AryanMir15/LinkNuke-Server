@@ -21,8 +21,53 @@ const paddleClient = new paddle.Client({
 });
 
 const Link = require("../models/Link.js");
+const {
+  canCreateLink,
+  canUploadFile,
+  updateStorageUsage,
+} = require("../utils/subscriptionUtils");
 
-// Existing link controller functions here...
+// Create link with subscription check
+const createLink = async (req, res) => {
+  try {
+    const { title, description, fileUrl, fileType, fileSize } = req.body;
+    const userId = req.user._id;
+
+    // Check if user can create more links
+    const linkCheck = await canCreateLink(userId);
+    if (!linkCheck.allowed) {
+      return res.status(403).json({ error: linkCheck.reason });
+    }
+
+    // Check if user can upload this file type/size
+    if (fileUrl && fileType && fileSize) {
+      const uploadCheck = await canUploadFile(userId, fileSize, fileType);
+      if (!uploadCheck.allowed) {
+        return res.status(403).json({ error: uploadCheck.reason });
+      }
+    }
+
+    const linkId = nanoid(10);
+    const link = await Link.create({
+      linkId,
+      title,
+      description,
+      fileUrl,
+      fileType,
+      fileSize,
+      userId,
+    });
+
+    // Update user's link count and storage usage
+    if (fileSize) {
+      await updateStorageUsage(userId, fileSize, "add");
+    }
+
+    res.status(201).json({ link });
+  } catch (error) {
+    res.status(500).json({ error: "Something went wrong" });
+  }
+};
 
 // Paddle Checkout functions
 const createCheckoutSession = async (req, res) => {

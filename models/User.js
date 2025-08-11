@@ -36,6 +36,34 @@ const UserSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    subscription: {
+      status: {
+        type: String,
+        enum: ["active", "cancelled", "paused", "past_due"],
+        default: null,
+      },
+      plan: {
+        type: String,
+        enum: ["starter", "pro", "lifetime"],
+        default: null,
+      },
+      subscriptionId: String,
+      transactionId: String,
+      customerId: String,
+      startDate: Date,
+      endDate: Date,
+      nextBillingDate: Date,
+    },
+    usage: {
+      linksCreated: {
+        type: Number,
+        default: 0,
+      },
+      storageUsed: {
+        type: Number,
+        default: 0, // in bytes
+      },
+    },
   },
 
   {
