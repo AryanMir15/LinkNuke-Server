@@ -1,6 +1,7 @@
 const express = require("express");
 const passport = require("passport");
 const router = express.Router();
+const { googleAuthCallback } = require("../controllers/auth");
 
 router.get(
   "/auth/google",
@@ -10,16 +11,10 @@ router.get(
 router.get(
   "/auth/google/callback",
   passport.authenticate("google", {
-    failureRedirect:
-      "https://link-bolt-git-main-aryan-mirs-projects.vercel.app/login",
+    failureRedirect: `${process.env.CLIENT_URL}/login`,
     session: false,
   }),
-  (req, res) => {
-    const token = req.user.createJWT();
-    res.redirect(
-      `https://link-bolt-git-main-aryan-mirs-projects.vercel.app/oauth-success?token=${token}`
-    );
-  }
+  googleAuthCallback
 );
 
 module.exports = router;

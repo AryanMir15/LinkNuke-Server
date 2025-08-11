@@ -4,6 +4,21 @@ const crypto = require("crypto");
 const { sendResetEmail } = require("../utils/sendResetEmail");
 const { sendVerificationPin } = require("../utils/sendVerificationPin");
 
+// Google OAuth callback handler
+const googleAuthCallback = async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.redirect("/login?error=oauth_failed");
+    }
+
+    const token = req.user.createJWT();
+    res.redirect(`/oauth-success?token=${token}&userId=${req.user._id}`);
+  } catch (error) {
+    console.error("Google OAuth error:", error);
+    res.redirect("/login?error=oauth_failed");
+  }
+};
+
 const register = async (req, res) => {
   try {
     const { firstName, lastName, email, password, confirmPassword } = req.body;
