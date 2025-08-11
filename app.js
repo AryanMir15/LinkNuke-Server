@@ -21,8 +21,7 @@ const authMiddleware = require("./middleware/auth");
 const authRouter = require("./routes/auth");
 const linkRouter = require("./routes/linkRoutes");
 const publicLinkRouter = require("./routes/publicLinkRoutes");
-
-//PLEASE be the last TE
+const paddleRouter = require("./routes/paddleRoutes");
 
 // ========== CORS Setup ==========
 const allowedOrigins = [
@@ -72,6 +71,7 @@ app.get("/", (req, res) => {
 app.use("/api/v1/public/links", publicLinkRouter);
 app.use("/api/v1", authRouter);
 app.use("/api/v1", authMiddleware, linkRouter);
+app.use("/api/v1/paddle", paddleRouter);
 
 // ========== Error Middleware ==========
 app.use(notFoundMiddleware);
