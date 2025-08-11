@@ -89,13 +89,94 @@ const createCheckoutSession = async (req, res) => {
   }
 };
 
+// Get all links
+const getAllLinks = async (req, res) => {
+  try {
+    const links = await Link.find({ userId: req.user._id }).sort({
+      createdAt: -1,
+    });
+    res.json({ links });
+  } catch (error) {
+    res.status(500).json({ error: "Something went wrong" });
+  }
+};
+
+// Get single link
+const getSingleLink = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const link = await Link.findOne({ _id: id, userId: req.user._id });
+    if (!link) return res.status(404).json({ error: "Link not found" });
+    res.json({ link });
+  } catch (error) {
+    res.status(500).json({ error: "Something went wrong" });
+  }
+};
+
+// Track link view
+const trackLinkView = async (req, res) => {
+  try {
+    const { linkId } = req.params;
+    const link = await Link.findOne({ linkId });
+    if (!link) return res.status(404).json({ error: "Link not found" });
+    link.views = (link.views || 0) + 1;
+    await link.save();
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Something went wrong" });
+  }
+};
+
+// Update link
+const updateLink = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description } = req.body;
+    const link = await Link.findOneAndUpdate(
+      { _id: id, userId: req.user._id },
+      { title, description },
+      { new: true }
+    );
+    if (!link) return res.status(404).json({ error: "Link not found" });
+    res.json({ link });
+  } catch (error) {
+    res.status(500).json({ error: "Something went wrong" });
+  }
+};
+
+// Delete link
+const deleteLink = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const link = await Link.findOneAndDelete({ _id: id, userId: req.user._id });
+    if (!link) return res.status(404).json({ error: "Link not found" });
+    if (link.fileSize)
+      await updateStorageUsage(req.user._id, link.fileSize, "remove");
+    res.json({ message: "Link deleted" });
+  } catch (error) {
+    res.status(500).json({ error: "Something went wrong" });
+  }
+};
+
+// Get link by linkId
+const getLinkByLinkId = async (req, res) => {
+  try {
+    const { linkId } = req.params;
+    const link = await Link.findOne({ linkId });
+    if (!link) return res.status(404).json({ error: "Link not found" });
+    res.json({ link });
+  } catch (error) {
+    res.status(500).json({ error: "Something went wrong" });
+  }
+};
+
 const handleWebhook = async (req, res) => {
   let event;
   try {
     event = paddleClient.webhooks.constructEvent(
       req.body,
       req.headers["paddle-signature"],
-      process.env.PADDLE_WEBHOOK_KEY
+      process.env.PADDLE_WEBHOOK_SECRET
     );
   } catch (err) {
     console.error("Webhook error:", err);
@@ -107,7 +188,6 @@ const handleWebhook = async (req, res) => {
       const payment = event.data;
       // Handle payment completion logic
       break;
-    // Add other webhook handlers as needed
   }
 
   res.json({ received: true });
