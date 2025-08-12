@@ -2,6 +2,20 @@ const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const User = require("../models/User");
 
+// Serialization required for passport session management
+passport.serializeUser((user, done) => {
+  done(null, user.id);
+});
+
+passport.deserializeUser(async (id, done) => {
+  try {
+    const user = await User.findById(id);
+    done(null, user);
+  } catch (err) {
+    done(err, null);
+  }
+});
+
 passport.use(
   new GoogleStrategy(
     {
@@ -12,6 +26,7 @@ passport.use(
     async (accessToken, refreshToken, profile, done) => {
       try {
         let user = await User.findOne({ email: profile.emails[0].value });
+
         if (!user) {
           user = await User.create({
             firstName: profile.name.givenName || "Google",
@@ -21,8 +36,15 @@ passport.use(
             isVerified: true,
           });
         }
+
+        // Ensure user object is properly formatted
+        if (!user.createJWT) {
+          throw new Error("User model missing JWT creation method");
+        }
+
         return done(null, user);
       } catch (err) {
+        console.error("Google strategy error:", err);
         return done(err, null);
       }
     }

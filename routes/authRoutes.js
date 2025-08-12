@@ -11,10 +11,28 @@ router.get(
 router.get(
   "/auth/google/callback",
   passport.authenticate("google", {
-    failureRedirect: `${process.env.CLIENT_URL}/login`,
+    failureRedirect: `${process.env.CLIENT_URL}/login?error=google_auth_failed`,
     session: false,
   }),
-  googleAuthCallback
+  (req, res) => {
+    try {
+      const state = req.query.state
+        ? JSON.parse(Buffer.from(req.query.state, "base64").toString())
+        : {};
+
+      const token = req.user.createJWT();
+      res.redirect(
+        `${process.env.CLIENT_URL}/oauth-success?token=${token}&redirectTo=${
+          state.redirectTo || ""
+        }`
+      );
+    } catch (err) {
+      console.error("Google callback error:", err);
+      res.redirect(
+        `${process.env.CLIENT_URL}/login?error=authentication_failed`
+      );
+    }
+  }
 );
 
 module.exports = router;
