@@ -7,6 +7,7 @@ const {
   cancelSubscription,
   updateSubscription,
   startTrial,
+  getClientToken,
 } = require("../controllers/paddleController");
 const authMiddleware = require("../middleware/auth");
 
@@ -15,6 +16,7 @@ router.post("/webhook", handleWebhook);
 
 // Protected routes (require authentication)
 router.post("/create-checkout", authMiddleware, createCheckoutSession);
+router.get("/client-token", authMiddleware, getClientToken);
 router.post("/start-trial", authMiddleware, startTrial);
 router.get("/subscription-status", authMiddleware, getSubscriptionStatus);
 router.post("/cancel-subscription", authMiddleware, cancelSubscription);

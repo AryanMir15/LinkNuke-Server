@@ -482,6 +482,28 @@ const updateSubscription = async (req, res) => {
   }
 };
 
+// Get client token for Paddle initialization
+const getClientToken = async (req, res) => {
+  try {
+    if (!paddle) {
+      console.error(
+        "Paddle client not initialized for client token generation"
+      );
+      return res.status(503).json({ error: "Payment service unavailable" });
+    }
+
+    // Generate a client token for the user
+    const clientToken = await paddle.clientTokens.create({
+      expiresIn: 3600, // 1 hour
+    });
+
+    res.json({ clientToken: clientToken.token });
+  } catch (error) {
+    console.error("Error generating client token:", error);
+    res.status(500).json({ error: "Failed to generate client token" });
+  }
+};
+
 // Start trial
 const startTrial = async (req, res) => {
   try {
@@ -533,4 +555,5 @@ module.exports = {
   cancelSubscription,
   updateSubscription,
   startTrial,
+  getClientToken,
 };
