@@ -53,6 +53,14 @@ const UserSchema = new mongoose.Schema(
       startDate: Date,
       endDate: Date,
       nextBillingDate: Date,
+      isTrial: {
+        type: Boolean,
+        default: false,
+      },
+      trialDays: {
+        type: Number,
+        default: 0,
+      },
     },
     usage: {
       linksCreated: {

@@ -323,10 +323,55 @@ const updateSubscription = async (req, res) => {
   }
 };
 
+// Start trial
+const startTrial = async (req, res) => {
+  try {
+    const { plan, trialDays = 3 } = req.body;
+    const user = req.user;
+
+    if (!PRODUCTS[plan]) {
+      return res.status(400).json({ error: "Invalid plan" });
+    }
+
+    // Check if user already has an active subscription or trial
+    if (user.subscription?.status === "active") {
+      return res
+        .status(400)
+        .json({ error: "You already have an active subscription" });
+    }
+
+    // Calculate trial end date
+    const trialEndDate = new Date();
+    trialEndDate.setDate(trialEndDate.getDate() + trialDays);
+
+    // Update user subscription to trial
+    user.subscription = {
+      status: "active",
+      plan: plan,
+      startDate: new Date(),
+      endDate: trialEndDate,
+      isTrial: true,
+      trialDays: trialDays,
+    };
+
+    await user.save();
+
+    res.json({
+      message: `Started ${plan} trial successfully`,
+      trialEndDate: trialEndDate,
+      trialDays: trialDays,
+    });
+  } catch (error) {
+    console.error("Trial start error:", error);
+    res.status(500).json({ error: "Failed to start trial" });
+  }
+};
+
 module.exports = {
   createCheckoutSession,
   handleWebhook,
   getSubscriptionStatus,
   cancelSubscription,
   updateSubscription,
+  startTrial,
 };
