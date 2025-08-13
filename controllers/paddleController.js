@@ -122,12 +122,17 @@ const createCheckoutSession = async (req, res) => {
 
     console.log("User found:", user.email);
 
-    // Create a price link for checkout
-    console.log("Creating Paddle price link...");
+    // Create transaction for checkout
+    console.log("Creating Paddle transaction...");
     try {
-      const priceLink = await paddle.prices.createLink({
-        priceId: product.priceId,
-        quantity: 1,
+      const transaction = await paddle.transactions.create({
+        items: [
+          {
+            priceId: product.priceId,
+            quantity: 1,
+          },
+        ],
+        customerEmail: user.email,
         customData: {
           userId: user._id.toString(),
           productType: productType,
@@ -137,15 +142,6 @@ const createCheckoutSession = async (req, res) => {
         returnUrl: `${process.env.CLIENT_URL}/checkout`,
       });
 
-      console.log("Price link created successfully:", priceLink.id);
-      console.log("Checkout URL:", priceLink.url);
-
-      res.json({
-        checkoutUrl: priceLink.url,
-        transactionId: priceLink.id,
-        originalCheckoutUrl: priceLink.url,
-      });
-
       console.log("Transaction created successfully:", transaction.id);
       console.log("Checkout URL:", transaction.checkout.url);
       console.log("Transaction status:", transaction.status);
@@ -153,7 +149,7 @@ const createCheckoutSession = async (req, res) => {
       res.json({
         checkoutUrl: transaction.checkout.url,
         transactionId: transaction.id,
-        originalCheckoutUrl: transaction.checkout.url, // Keep the original URL for fallback
+        originalCheckoutUrl: transaction.checkout.url,
       });
     } catch (transactionError) {
       console.error("Transaction creation failed:", transactionError);
@@ -184,10 +180,14 @@ const createCheckoutSession = async (req, res) => {
           };
           await user.save();
 
-          // Now create price link with customer ID
-          const priceLink = await paddle.prices.createLink({
-            priceId: product.priceId,
-            quantity: 1,
+          // Now create transaction with customer ID
+          const transaction = await paddle.transactions.create({
+            items: [
+              {
+                priceId: product.priceId,
+                quantity: 1,
+              },
+            ],
             customerId: created.id,
             customData: {
               userId: user._id.toString(),
@@ -199,15 +199,15 @@ const createCheckoutSession = async (req, res) => {
           });
 
           console.log(
-            "Price link created successfully with customer:",
-            priceLink.id
+            "Transaction created successfully with customer:",
+            transaction.id
           );
-          console.log("Checkout URL:", priceLink.url);
+          console.log("Checkout URL:", transaction.checkout.url);
 
           res.json({
-            checkoutUrl: priceLink.url,
-            transactionId: priceLink.id,
-            originalCheckoutUrl: priceLink.url, // Keep the original URL for fallback
+            checkoutUrl: transaction.checkout.url,
+            transactionId: transaction.id,
+            originalCheckoutUrl: transaction.checkout.url,
           });
         } catch (customerError) {
           console.error("Customer creation also failed:", customerError);
