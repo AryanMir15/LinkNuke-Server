@@ -122,7 +122,7 @@ const createCheckoutSession = async (req, res) => {
 
     console.log("User found:", user.email);
 
-    // Try to create transaction without customer first, let Paddle handle customer creation
+    // Create transaction with the default payment link configured in dashboard
     console.log("Creating Paddle transaction...");
     try {
       const transaction = await paddle.transactions.create({
@@ -140,12 +140,6 @@ const createCheckoutSession = async (req, res) => {
         successUrl: `${process.env.CLIENT_URL}/dashboard?payment=success`,
         cancelUrl: `${process.env.CLIENT_URL}/pricing?payment=cancelled`,
         returnUrl: `${process.env.CLIENT_URL}/dashboard?payment=return`,
-        // Add these required fields to avoid the default checkout URL error
-        checkout: {
-          successUrl: `${process.env.CLIENT_URL}/dashboard?payment=success`,
-          cancelUrl: `${process.env.CLIENT_URL}/pricing?payment=cancelled`,
-          returnUrl: `${process.env.CLIENT_URL}/dashboard?payment=return`,
-        },
       });
 
       console.log("Transaction created successfully:", transaction.id);
@@ -157,56 +151,8 @@ const createCheckoutSession = async (req, res) => {
     } catch (transactionError) {
       console.error("Transaction creation failed:", transactionError);
 
-      // Handle the specific default checkout URL error
-      if (
-        transactionError.code === "transaction_default_checkout_url_not_set"
-      ) {
-        console.log(
-          "Default checkout URL not set, trying with explicit checkout configuration..."
-        );
-
-        try {
-          const transaction = await paddle.transactions.create({
-            items: [
-              {
-                priceId: product.priceId,
-                quantity: 1,
-              },
-            ],
-            customerEmail: user.email,
-            customData: {
-              userId: user._id.toString(),
-              productType: productType,
-            },
-            // Explicit checkout configuration
-            checkout: {
-              successUrl: `${process.env.CLIENT_URL}/dashboard?payment=success`,
-              cancelUrl: `${process.env.CLIENT_URL}/pricing?payment=cancelled`,
-              returnUrl: `${process.env.CLIENT_URL}/dashboard?payment=return`,
-            },
-          });
-
-          console.log(
-            "Transaction created successfully with explicit checkout:",
-            transaction.id
-          );
-
-          res.json({
-            checkoutUrl: transaction.checkout.url,
-            transactionId: transaction.id,
-          });
-        } catch (explicitError) {
-          console.error(
-            "Explicit checkout configuration also failed:",
-            explicitError
-          );
-          return res.status(500).json({
-            error: "Payment configuration error. Please contact support.",
-          });
-        }
-      }
       // If transaction creation fails, try with customer creation
-      else if (
+      if (
         transactionError.code === "forbidden" ||
         transactionError.detail?.includes("customer")
       ) {
@@ -247,11 +193,6 @@ const createCheckoutSession = async (req, res) => {
             successUrl: `${process.env.CLIENT_URL}/dashboard?payment=success`,
             cancelUrl: `${process.env.CLIENT_URL}/pricing?payment=cancelled`,
             returnUrl: `${process.env.CLIENT_URL}/dashboard?payment=return`,
-            checkout: {
-              successUrl: `${process.env.CLIENT_URL}/dashboard?payment=success`,
-              cancelUrl: `${process.env.CLIENT_URL}/pricing?payment=cancelled`,
-              returnUrl: `${process.env.CLIENT_URL}/dashboard?payment=return`,
-            },
           });
 
           console.log(
