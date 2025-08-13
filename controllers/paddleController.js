@@ -219,6 +219,13 @@ const createCheckoutSession = async (req, res) => {
   } catch (error) {
     console.error("Checkout creation error:", error);
     console.error("Error stack:", error.stack);
+    console.error("Error details:", {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      type: error.type,
+      errors: error.errors,
+    });
     res.status(500).json({ error: "Failed to create checkout session" });
   }
 };
