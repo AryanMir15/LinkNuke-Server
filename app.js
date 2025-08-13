@@ -19,6 +19,7 @@ const authMiddleware = require("./middleware/auth");
 
 // Routes
 const authRouter = require("./routes/auth");
+const googleAuthRouter = require("./routes/authRoutes");
 const linkRouter = require("./routes/linkRoutes");
 const publicLinkRouter = require("./routes/publicLinkRoutes");
 const paddleRouter = require("./routes/paddleRoutes");
@@ -75,6 +76,7 @@ app.get("/", (req, res) => {
 
 app.use("/api/v1/public/links", publicLinkRouter);
 app.use("/api/v1", authRouter);
+app.use("/api/v1", googleAuthRouter);
 app.use("/api/v1", authMiddleware, linkRouter);
 app.use("/api/v1/paddle", paddleRouter);
 

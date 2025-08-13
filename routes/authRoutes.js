@@ -5,7 +5,12 @@ const { googleAuthCallback } = require("../controllers/auth");
 
 router.get(
   "/auth/google",
-  passport.authenticate("google", { scope: ["profile", "email"] })
+  passport.authenticate("google", {
+    scope: ["profile", "email"],
+    state: Buffer.from(
+      JSON.stringify({ redirectTo: process.env.CLIENT_URL || "" })
+    ).toString("base64"),
+  })
 );
 
 router.get(
