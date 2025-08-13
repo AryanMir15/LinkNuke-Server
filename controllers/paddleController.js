@@ -137,9 +137,9 @@ const createCheckoutSession = async (req, res) => {
           userId: user._id.toString(),
           productType: productType,
         },
-        successUrl: `${process.env.CLIENT_URL}/dashboard?payment=success`,
-        cancelUrl: `${process.env.CLIENT_URL}/pricing?payment=cancelled`,
-        returnUrl: `${process.env.CLIENT_URL}/dashboard?payment=return`,
+        successUrl: `${process.env.CLIENT_URL}/checkout?payment=success`,
+        cancelUrl: `${process.env.CLIENT_URL}/checkout?payment=cancelled`,
+        returnUrl: `${process.env.CLIENT_URL}/checkout?payment=return`,
       });
 
       console.log("Transaction created successfully:", transaction.id);
@@ -190,9 +190,9 @@ const createCheckoutSession = async (req, res) => {
               userId: user._id.toString(),
               productType: productType,
             },
-            successUrl: `${process.env.CLIENT_URL}/dashboard?payment=success`,
-            cancelUrl: `${process.env.CLIENT_URL}/pricing?payment=cancelled`,
-            returnUrl: `${process.env.CLIENT_URL}/dashboard?payment=return`,
+            successUrl: `${process.env.CLIENT_URL}/checkout?payment=success`,
+            cancelUrl: `${process.env.CLIENT_URL}/checkout?payment=cancelled`,
+            returnUrl: `${process.env.CLIENT_URL}/checkout?payment=return`,
           });
 
           console.log(
