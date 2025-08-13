@@ -497,7 +497,6 @@ const getClientToken = async (req, res) => {
     // Generate a client token for the user
     const clientToken = await paddle.clientTokens.create({
       name: "LinkNuke Checkout",
-      expiresIn: 3600, // 1 hour
     });
 
     res.json({ clientToken: clientToken.token });
