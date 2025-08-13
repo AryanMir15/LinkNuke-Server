@@ -122,103 +122,52 @@ const createCheckoutSession = async (req, res) => {
 
     console.log("User found:", user.email);
 
-    // Create transaction for checkout
-    console.log("Creating Paddle transaction...");
-    try {
-      const transaction = await paddle.transactions.create({
-        items: [
-          {
-            priceId: product.priceId,
-            quantity: 1,
-          },
-        ],
-        customerEmail: user.email,
-        customData: {
-          userId: user._id.toString(),
-          productType: productType,
-        },
-        successUrl: `${process.env.CLIENT_URL}/dashboard?payment=success`,
-        cancelUrl: `${process.env.CLIENT_URL}/pricing?payment=cancelled`,
-      });
+    // Use hosted checkout approach
+    console.log("Creating hosted checkout URL...");
 
-      console.log("Transaction created successfully:", transaction.id);
-      console.log("Checkout URL:", transaction.checkout.url);
-      console.log("Transaction status:", transaction.status);
+    // Build the hosted checkout URL with parameters
+    const hostedCheckoutUrl = new URL(
+      "https://sandbox-pay.paddle.io/hsc_01k2hs7cq223hqjfjb1e37pm1b_zv8rjbpb4zteq84hdrf0v0k0g3wgfxt6"
+    );
 
-      res.json({
-        checkoutUrl: transaction.checkout.url,
-        transactionId: transaction.id,
-        originalCheckoutUrl: transaction.checkout.url,
-      });
-    } catch (transactionError) {
-      console.error("Transaction creation failed:", transactionError);
+    // Add the specific price_id for the selected plan
+    hostedCheckoutUrl.searchParams.set("price_id", product.priceId);
+    hostedCheckoutUrl.searchParams.set("quantity", "1");
+    hostedCheckoutUrl.searchParams.set("customer_email", user.email);
 
-      // If transaction creation fails, try with customer creation
-      if (
-        transactionError.code === "forbidden" ||
-        transactionError.detail?.includes("customer")
-      ) {
-        console.log("Trying alternative approach with customer creation...");
+    // Add custom data to track which plan was selected
+    hostedCheckoutUrl.searchParams.set(
+      "passthrough",
+      JSON.stringify({
+        userId: user._id.toString(),
+        productType: productType,
+        planName: product.name,
+      })
+    );
 
-        try {
-          // Try to create customer first
-          const created = await paddle.customers.create({
-            email: user.email,
-            name:
-              `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
-              user.email,
-            customData: { userId: user._id.toString() },
-          });
+    // Set redirect URLs
+    hostedCheckoutUrl.searchParams.set(
+      "success_url",
+      `${process.env.CLIENT_URL}/dashboard?payment=success`
+    );
+    hostedCheckoutUrl.searchParams.set(
+      "cancel_url",
+      `${process.env.CLIENT_URL}/pricing?payment=cancelled`
+    );
 
-          console.log("Created Paddle customer ID:", created.id);
+    // Optional: Add these for better UX
+    hostedCheckoutUrl.searchParams.set("disable_quantity", "true");
+    hostedCheckoutUrl.searchParams.set("disable_coupon", "true");
 
-          // Update user with customer ID
-          user.subscription = {
-            ...(user.subscription || {}),
-            customerId: created.id,
-          };
-          await user.save();
+    console.log("Hosted checkout URL created:", hostedCheckoutUrl.toString());
+    console.log("Selected plan:", product.name);
+    console.log("Price ID:", product.priceId);
 
-          // Now create transaction with customer ID
-          const transaction = await paddle.transactions.create({
-            items: [
-              {
-                priceId: product.priceId,
-                quantity: 1,
-              },
-            ],
-            customerId: created.id,
-            customData: {
-              userId: user._id.toString(),
-              productType: productType,
-            },
-            successUrl: `${process.env.CLIENT_URL}/dashboard?payment=success`,
-            cancelUrl: `${process.env.CLIENT_URL}/pricing?payment=cancelled`,
-          });
-
-          console.log(
-            "Transaction created successfully with customer:",
-            transaction.id
-          );
-          console.log("Checkout URL:", transaction.checkout.url);
-
-          res.json({
-            checkoutUrl: transaction.checkout.url,
-            transactionId: transaction.id,
-            originalCheckoutUrl: transaction.checkout.url,
-          });
-        } catch (customerError) {
-          console.error("Customer creation also failed:", customerError);
-          return res.status(500).json({
-            error:
-              "Unable to process payment. Please check your Paddle configuration or contact support.",
-          });
-        }
-      } else {
-        // Re-throw if it's not a customer-related error
-        throw transactionError;
-      }
-    }
+    res.json({
+      checkoutUrl: hostedCheckoutUrl.toString(),
+      transactionId: null,
+      originalCheckoutUrl: hostedCheckoutUrl.toString(),
+    });
   } catch (error) {
     console.error("Checkout creation error:", error);
     console.error("Error stack:", error.stack);
