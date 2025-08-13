@@ -3,24 +3,32 @@ const User = require("../models/User");
 // Plan limits configuration
 const PLAN_LIMITS = {
   free: {
-    linksPerMonth: 10,
-    storageLimit: 100 * 1024 * 1024, // 100MB
+    linksPerMonth: 5,
+    storageLimit: 50 * 1024 * 1024, // 50MB
     fileTypes: ["image", "text"],
+    maxFilesPerLink: 1, // Only 1 file per link
+    maxFileSize: 50 * 1024 * 1024, // 50MB per file
   },
   starter: {
     linksPerMonth: 50,
     storageLimit: 1 * 1024 * 1024 * 1024, // 1GB
     fileTypes: ["image", "text"],
+    maxFilesPerLink: 5, // Up to 5 files per link
+    maxFileSize: 100 * 1024 * 1024, // 100MB per file
   },
   pro: {
     linksPerMonth: 500,
     storageLimit: 10 * 1024 * 1024 * 1024, // 10GB
     fileTypes: ["image", "video", "text", "audio", "document"],
+    maxFilesPerLink: 10, // Up to 10 files per link
+    maxFileSize: 500 * 1024 * 1024, // 500MB per file
   },
   lifetime: {
     linksPerMonth: -1, // Unlimited
     storageLimit: -1, // Unlimited
     fileTypes: ["image", "video", "text", "audio", "document"],
+    maxFilesPerLink: -1, // Unlimited files per link
+    maxFileSize: -1, // Unlimited file size
   },
 };
 
@@ -61,14 +69,24 @@ const canCreateLink = async (userId) => {
   }
 };
 
-// Check if user can upload file
-const canUploadFile = async (userId, fileSize, fileType) => {
+// Check if user can upload files
+const canUploadFile = async (userId, fileSize, fileType, fileCount = 1) => {
   try {
     const user = await User.findById(userId);
     if (!user) return { allowed: false, reason: "User not found" };
 
     const plan = user.subscription?.plan || "free";
     const limits = PLAN_LIMITS[plan];
+
+    // Check file count limit
+    if (limits.maxFilesPerLink !== -1 && fileCount > limits.maxFilesPerLink) {
+      return {
+        allowed: false,
+        reason: `You can only upload up to ${limits.maxFilesPerLink} file${
+          limits.maxFilesPerLink !== 1 ? "s" : ""
+        } per link. Upgrade to Pro for more.`,
+      };
+    }
 
     // Check file type
     const allowedTypes = limits.fileTypes;
@@ -78,6 +96,16 @@ const canUploadFile = async (userId, fileSize, fileType) => {
       return {
         allowed: false,
         reason: `${fileCategory} files are not supported in your current plan. Upgrade to Pro or Lifetime for all file types.`,
+      };
+    }
+
+    // Check individual file size
+    if (limits.maxFileSize !== -1 && fileSize > limits.maxFileSize) {
+      return {
+        allowed: false,
+        reason: `File size must be under ${formatBytes(
+          limits.maxFileSize
+        )}. Upgrade to Pro for larger files.`,
       };
     }
 
@@ -160,13 +188,18 @@ const getUserPlanLimits = (user) => {
 
 // Check if user has active subscription
 const hasActiveSubscription = (user) => {
-  return user.subscription?.status === "active";
+  return user.subscription?.status === "active" && !user.subscription?.isTrial;
 };
 
 // Check if user has premium features
 const hasPremiumFeatures = (user) => {
   const plan = user.subscription?.plan;
   return plan === "pro" || plan === "lifetime";
+};
+
+// Check if user is on free plan
+const isOnFreePlan = (user) => {
+  return !user.subscription?.plan || user.subscription?.plan === "free";
 };
 
 module.exports = {
@@ -176,6 +209,7 @@ module.exports = {
   getUserPlanLimits,
   hasActiveSubscription,
   hasPremiumFeatures,
+  isOnFreePlan,
   PLAN_LIMITS,
   formatBytes,
   getFileCategory,

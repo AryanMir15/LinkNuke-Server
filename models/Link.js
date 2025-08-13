@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { nanoid } = require("nanoid");
 
 const LinkSchema = new mongoose.Schema(
   {
@@ -74,5 +75,20 @@ const LinkSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Pre-save hook to generate linkId and url if not provided
+LinkSchema.pre("save", function (next) {
+  if (!this.linkId) {
+    this.linkId = nanoid(10);
+  }
+
+  if (!this.url) {
+    this.url = `${process.env.CLIENT_URL || "http://localhost:3000"}/l/${
+      this.linkId
+    }`;
+  }
+
+  next();
+});
 
 module.exports = mongoose.model("Link", LinkSchema);
