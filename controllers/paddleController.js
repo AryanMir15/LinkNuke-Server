@@ -24,15 +24,28 @@ if (missingEnvVars.length > 0) {
 let paddle = null;
 if (process.env.PADDLE_API_KEY) {
   try {
-    paddle = new Paddle(process.env.PADDLE_API_KEY, {
-      environment:
-        process.env.PADDLE_ENV === "sandbox"
-          ? Environment.sandbox
-          : Environment.production,
-    });
+    const environment =
+      process.env.PADDLE_ENV === "sandbox"
+        ? Environment.sandbox
+        : Environment.production;
+
     console.log(
-      "Paddle initialized with environment:",
+      "Initializing Paddle with environment:",
       process.env.PADDLE_ENV || "production"
+    );
+    console.log(
+      "API Key prefix:",
+      process.env.PADDLE_API_KEY.substring(0, 10) + "..."
+    );
+
+    paddle = new Paddle(process.env.PADDLE_API_KEY, {
+      environment: environment,
+    });
+
+    console.log("Paddle initialized successfully");
+    console.log(
+      "Environment:",
+      environment === Environment.sandbox ? "sandbox" : "production"
     );
   } catch (error) {
     console.error("Failed to initialize Paddle client:", error);
@@ -109,53 +122,100 @@ const createCheckoutSession = async (req, res) => {
 
     console.log("User found:", user.email);
 
-    // Create or fetch Paddle customer by stored customerId
-    let paddleCustomerId = user.subscription?.customerId;
-    if (!paddleCustomerId) {
-      console.log("Creating new Paddle customer for user:", user.email);
-      const created = await paddle.customers.create({
-        email: user.email,
-        name: `${user.firstName} ${user.lastName}`,
-        customData: { userId: user._id.toString() },
-      });
-      paddleCustomerId = created.id;
-      console.log("Created Paddle customer ID:", paddleCustomerId);
-
-      // persist on user
-      user.subscription = {
-        ...(user.subscription || {}),
-        customerId: paddleCustomerId,
-      };
-      await user.save();
-    } else {
-      console.log("Using existing Paddle customer ID:", paddleCustomerId);
-    }
-
-    // Create transaction
+    // Try to create transaction without customer first, let Paddle handle customer creation
     console.log("Creating Paddle transaction...");
-    const transaction = await paddle.transactions.create({
-      items: [
-        {
-          priceId: product.priceId,
-          quantity: 1,
+    try {
+      const transaction = await paddle.transactions.create({
+        items: [
+          {
+            priceId: product.priceId,
+            quantity: 1,
+          },
+        ],
+        customerEmail: user.email,
+        customData: {
+          userId: user._id.toString(),
+          productType: productType,
         },
-      ],
-      customerId: paddleCustomerId,
-      customData: {
-        userId: user._id.toString(),
-        productType: productType,
-      },
-      successUrl: `${process.env.CLIENT_URL}/dashboard?payment=success`,
-      cancelUrl: `${process.env.CLIENT_URL}/pricing?payment=cancelled`,
-      returnUrl: `${process.env.CLIENT_URL}/dashboard?payment=return`,
-    });
+        successUrl: `${process.env.CLIENT_URL}/dashboard?payment=success`,
+        cancelUrl: `${process.env.CLIENT_URL}/pricing?payment=cancelled`,
+        returnUrl: `${process.env.CLIENT_URL}/dashboard?payment=return`,
+      });
 
-    console.log("Transaction created successfully:", transaction.id);
+      console.log("Transaction created successfully:", transaction.id);
 
-    res.json({
-      checkoutUrl: transaction.checkout.url,
-      transactionId: transaction.id,
-    });
+      res.json({
+        checkoutUrl: transaction.checkout.url,
+        transactionId: transaction.id,
+      });
+    } catch (transactionError) {
+      console.error("Transaction creation failed:", transactionError);
+
+      // If transaction creation fails, try with customer creation
+      if (
+        transactionError.code === "forbidden" ||
+        transactionError.detail?.includes("customer")
+      ) {
+        console.log("Trying alternative approach with customer creation...");
+
+        try {
+          // Try to create customer first
+          const created = await paddle.customers.create({
+            email: user.email,
+            name:
+              `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
+              user.email,
+            customData: { userId: user._id.toString() },
+          });
+
+          console.log("Created Paddle customer ID:", created.id);
+
+          // Update user with customer ID
+          user.subscription = {
+            ...(user.subscription || {}),
+            customerId: created.id,
+          };
+          await user.save();
+
+          // Now create transaction with customer ID
+          const transaction = await paddle.transactions.create({
+            items: [
+              {
+                priceId: product.priceId,
+                quantity: 1,
+              },
+            ],
+            customerId: created.id,
+            customData: {
+              userId: user._id.toString(),
+              productType: productType,
+            },
+            successUrl: `${process.env.CLIENT_URL}/dashboard?payment=success`,
+            cancelUrl: `${process.env.CLIENT_URL}/pricing?payment=cancelled`,
+            returnUrl: `${process.env.CLIENT_URL}/dashboard?payment=return`,
+          });
+
+          console.log(
+            "Transaction created successfully with customer:",
+            transaction.id
+          );
+
+          res.json({
+            checkoutUrl: transaction.checkout.url,
+            transactionId: transaction.id,
+          });
+        } catch (customerError) {
+          console.error("Customer creation also failed:", customerError);
+          return res.status(500).json({
+            error:
+              "Unable to process payment. Please check your Paddle configuration or contact support.",
+          });
+        }
+      } else {
+        // Re-throw if it's not a customer-related error
+        throw transactionError;
+      }
+    }
   } catch (error) {
     console.error("Checkout creation error:", error);
     console.error("Error stack:", error.stack);
