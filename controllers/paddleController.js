@@ -139,7 +139,6 @@ const createCheckoutSession = async (req, res) => {
         },
         successUrl: `${process.env.CLIENT_URL}/dashboard?payment=success`,
         cancelUrl: `${process.env.CLIENT_URL}/pricing?payment=cancelled`,
-        returnUrl: `${process.env.CLIENT_URL}/dashboard`,
       });
 
       console.log("Transaction created successfully:", transaction.id);
@@ -195,7 +194,6 @@ const createCheckoutSession = async (req, res) => {
             },
             successUrl: `${process.env.CLIENT_URL}/dashboard?payment=success`,
             cancelUrl: `${process.env.CLIENT_URL}/pricing?payment=cancelled`,
-            returnUrl: `${process.env.CLIENT_URL}/dashboard`,
           });
 
           console.log(
