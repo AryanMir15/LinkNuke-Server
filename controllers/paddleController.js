@@ -143,6 +143,7 @@ const createCheckoutSession = async (req, res) => {
       });
 
       console.log("Transaction created successfully:", transaction.id);
+      console.log("Checkout URL:", transaction.checkout.url);
 
       res.json({
         checkoutUrl: transaction.checkout.url,
@@ -200,6 +201,7 @@ const createCheckoutSession = async (req, res) => {
             "Transaction created successfully with customer:",
             transaction.id
           );
+          console.log("Checkout URL:", transaction.checkout.url);
 
           res.json({
             checkoutUrl: transaction.checkout.url,
