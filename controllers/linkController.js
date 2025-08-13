@@ -56,14 +56,20 @@ const createLink = async (req, res) => {
       format !== "text" &&
       (imageUrl || videoUrl || audioUrl || documentUrl)
     ) {
-      // For now, we'll assume the file size check was done on the frontend
-      // In a production app, you'd want to validate file sizes here too
-      const fileCheck = await canUploadFile(
-        userId,
-        0,
-        "application/octet-stream",
-        1
-      );
+      // Determine the file type based on the format and URL
+      let fileType = "text/plain"; // default
+
+      if (format === "image" && imageUrl) {
+        fileType = "image/jpeg"; // assume JPEG for images
+      } else if (format === "video" && videoUrl) {
+        fileType = "video/mp4"; // assume MP4 for videos
+      } else if (format === "audio" && audioUrl) {
+        fileType = "audio/mpeg"; // assume MP3 for audio
+      } else if (format === "document" && documentUrl) {
+        fileType = "application/pdf"; // assume PDF for documents
+      }
+
+      const fileCheck = await canUploadFile(userId, 0, fileType, 1);
       if (!fileCheck.allowed) {
         return res.status(403).json({ error: fileCheck.reason });
       }

@@ -88,10 +88,29 @@ const LinkSchema = new mongoose.Schema(
 
 // Pre-save hook to generate linkId and url if not provided
 LinkSchema.pre("save", function (next) {
+  // Generate linkId if not provided
   if (!this.linkId) {
     this.linkId = generateLinkId(10);
   }
 
+  // Generate url if not provided
+  if (!this.url) {
+    this.url = `${process.env.CLIENT_URL || "http://localhost:3000"}/l/${
+      this.linkId
+    }`;
+  }
+
+  next();
+});
+
+// Pre-validate hook to ensure linkId and url are set before validation
+LinkSchema.pre("validate", function (next) {
+  // Generate linkId if not provided
+  if (!this.linkId) {
+    this.linkId = generateLinkId(10);
+  }
+
+  // Generate url if not provided
   if (!this.url) {
     this.url = `${process.env.CLIENT_URL || "http://localhost:3000"}/l/${
       this.linkId
