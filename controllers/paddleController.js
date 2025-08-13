@@ -1,6 +1,25 @@
 const { Paddle, Environment } = require("@paddle/paddle-node-sdk");
 const User = require("../models/User");
 
+// Validate required environment variables
+const requiredEnvVars = [
+  "PADDLE_API_KEY",
+  "PADDLE_STARTER_PRICE_ID",
+  "PADDLE_PRO_PRICE_ID",
+  "PADDLE_LIFETIME_PRICE_ID",
+  "CLIENT_URL",
+];
+
+const missingEnvVars = requiredEnvVars.filter(
+  (varName) => !process.env[varName]
+);
+if (missingEnvVars.length > 0) {
+  console.error("Missing required environment variables:", missingEnvVars);
+  throw new Error(
+    `Missing required environment variables: ${missingEnvVars.join(", ")}`
+  );
+}
+
 // Initialize Paddle client
 const paddle = new Paddle(process.env.PADDLE_API_KEY, {
   environment:
@@ -8,6 +27,11 @@ const paddle = new Paddle(process.env.PADDLE_API_KEY, {
       ? Environment.sandbox
       : Environment.production,
 });
+
+console.log(
+  "Paddle initialized with environment:",
+  process.env.PADDLE_ENV || "production"
+);
 
 // Product/Price mapping
 const PRODUCTS = {
@@ -31,36 +55,59 @@ const PRODUCTS = {
   },
 };
 
+console.log("Product configuration loaded:", Object.keys(PRODUCTS));
+
 // Create checkout session
 const createCheckoutSession = async (req, res) => {
   try {
+    console.log("Creating checkout session with body:", req.body);
     const { productType } = req.body;
-    const user = req.user;
+    const userId = req.user._id;
+
+    console.log("User ID:", userId);
+    console.log("Product Type:", productType);
 
     if (!PRODUCTS[productType]) {
+      console.error("Invalid product type:", productType);
       return res.status(400).json({ error: "Invalid product type" });
     }
 
     const product = PRODUCTS[productType];
+    console.log("Product config:", product);
+
+    // Get full user object from database
+    const user = await User.findById(userId);
+    if (!user) {
+      console.error("User not found:", userId);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    console.log("User found:", user.email);
 
     // Create or fetch Paddle customer by stored customerId
     let paddleCustomerId = user.subscription?.customerId;
     if (!paddleCustomerId) {
+      console.log("Creating new Paddle customer for user:", user.email);
       const created = await paddle.customers.create({
         email: user.email,
         name: `${user.firstName} ${user.lastName}`,
         customData: { userId: user._id.toString() },
       });
       paddleCustomerId = created.id;
+      console.log("Created Paddle customer ID:", paddleCustomerId);
+
       // persist on user
       user.subscription = {
         ...(user.subscription || {}),
         customerId: paddleCustomerId,
       };
       await user.save();
+    } else {
+      console.log("Using existing Paddle customer ID:", paddleCustomerId);
     }
 
     // Create transaction
+    console.log("Creating Paddle transaction...");
     const transaction = await paddle.transactions.create({
       items: [
         {
@@ -78,12 +125,15 @@ const createCheckoutSession = async (req, res) => {
       returnUrl: `${process.env.CLIENT_URL}/dashboard?payment=return`,
     });
 
+    console.log("Transaction created successfully:", transaction.id);
+
     res.json({
       checkoutUrl: transaction.checkout.url,
       transactionId: transaction.id,
     });
   } catch (error) {
     console.error("Checkout creation error:", error);
+    console.error("Error stack:", error.stack);
     res.status(500).json({ error: "Failed to create checkout session" });
   }
 };
