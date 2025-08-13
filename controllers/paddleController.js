@@ -122,17 +122,12 @@ const createCheckoutSession = async (req, res) => {
 
     console.log("User found:", user.email);
 
-    // Create transaction with the default payment link configured in dashboard
-    console.log("Creating Paddle transaction...");
+    // Create a price link for checkout
+    console.log("Creating Paddle price link...");
     try {
-      const transaction = await paddle.transactions.create({
-        items: [
-          {
-            priceId: product.priceId,
-            quantity: 1,
-          },
-        ],
-        customerEmail: user.email,
+      const priceLink = await paddle.prices.createLink({
+        priceId: product.priceId,
+        quantity: 1,
         customData: {
           userId: user._id.toString(),
           productType: productType,
@@ -142,8 +137,18 @@ const createCheckoutSession = async (req, res) => {
         returnUrl: `${process.env.CLIENT_URL}/checkout`,
       });
 
+      console.log("Price link created successfully:", priceLink.id);
+      console.log("Checkout URL:", priceLink.url);
+
+      res.json({
+        checkoutUrl: priceLink.url,
+        transactionId: priceLink.id,
+        originalCheckoutUrl: priceLink.url,
+      });
+
       console.log("Transaction created successfully:", transaction.id);
       console.log("Checkout URL:", transaction.checkout.url);
+      console.log("Transaction status:", transaction.status);
 
       res.json({
         checkoutUrl: transaction.checkout.url,
@@ -179,14 +184,10 @@ const createCheckoutSession = async (req, res) => {
           };
           await user.save();
 
-          // Now create transaction with customer ID
-          const transaction = await paddle.transactions.create({
-            items: [
-              {
-                priceId: product.priceId,
-                quantity: 1,
-              },
-            ],
+          // Now create price link with customer ID
+          const priceLink = await paddle.prices.createLink({
+            priceId: product.priceId,
+            quantity: 1,
             customerId: created.id,
             customData: {
               userId: user._id.toString(),
@@ -198,15 +199,15 @@ const createCheckoutSession = async (req, res) => {
           });
 
           console.log(
-            "Transaction created successfully with customer:",
-            transaction.id
+            "Price link created successfully with customer:",
+            priceLink.id
           );
-          console.log("Checkout URL:", transaction.checkout.url);
+          console.log("Checkout URL:", priceLink.url);
 
           res.json({
-            checkoutUrl: transaction.checkout.url,
-            transactionId: transaction.id,
-            originalCheckoutUrl: transaction.checkout.url, // Keep the original URL for fallback
+            checkoutUrl: priceLink.url,
+            transactionId: priceLink.id,
+            originalCheckoutUrl: priceLink.url, // Keep the original URL for fallback
           });
         } catch (customerError) {
           console.error("Customer creation also failed:", customerError);
