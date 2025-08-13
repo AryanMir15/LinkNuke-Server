@@ -1,5 +1,15 @@
 const mongoose = require("mongoose");
-const { nanoid } = require("nanoid");
+
+// Simple function to generate random string for linkId
+function generateLinkId(length = 10) {
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let result = "";
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
 
 const LinkSchema = new mongoose.Schema(
   {
@@ -79,7 +89,7 @@ const LinkSchema = new mongoose.Schema(
 // Pre-save hook to generate linkId and url if not provided
 LinkSchema.pre("save", function (next) {
   if (!this.linkId) {
-    this.linkId = nanoid(10);
+    this.linkId = generateLinkId(10);
   }
 
   if (!this.url) {

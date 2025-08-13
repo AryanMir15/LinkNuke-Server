@@ -1,4 +1,3 @@
-const { nanoid } = require("nanoid");
 const dayjs = require("dayjs");
 const customParseFormat = require("dayjs/plugin/customParseFormat.js");
 const paddle = require("@paddle/paddle-node-sdk");
