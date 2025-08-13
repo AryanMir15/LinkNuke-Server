@@ -1,10 +1,12 @@
-const { Paddle } = require("@paddle/paddle-node-sdk");
+const { Paddle, Environment } = require("@paddle/paddle-node-sdk");
 const User = require("../models/User");
 
 // Initialize Paddle client
-const paddle = new Paddle({
-  environment: process.env.PADDLE_ENV === "sandbox" ? "sandbox" : "production",
-  apiKey: process.env.PADDLE_API_KEY,
+const paddle = new Paddle(process.env.PADDLE_API_KEY, {
+  environment:
+    process.env.PADDLE_ENV === "sandbox"
+      ? Environment.sandbox
+      : Environment.production,
 });
 
 // Product/Price mapping
@@ -41,21 +43,21 @@ const createCheckoutSession = async (req, res) => {
 
     const product = PRODUCTS[productType];
 
-    // Create customer if doesn't exist
-    let customer;
-    try {
-      customer = await paddle.customers.get({
-        customerId: user._id.toString(),
-      });
-    } catch (error) {
-      // Customer doesn't exist, create one
-      customer = await paddle.customers.create({
+    // Create or fetch Paddle customer by stored customerId
+    let paddleCustomerId = user.subscription?.customerId;
+    if (!paddleCustomerId) {
+      const created = await paddle.customers.create({
         email: user.email,
         name: `${user.firstName} ${user.lastName}`,
-        customData: {
-          userId: user._id.toString(),
-        },
+        customData: { userId: user._id.toString() },
       });
+      paddleCustomerId = created.id;
+      // persist on user
+      user.subscription = {
+        ...(user.subscription || {}),
+        customerId: paddleCustomerId,
+      };
+      await user.save();
     }
 
     // Create transaction
@@ -66,7 +68,7 @@ const createCheckoutSession = async (req, res) => {
           quantity: 1,
         },
       ],
-      customerId: customer.id,
+      customerId: paddleCustomerId,
       customData: {
         userId: user._id.toString(),
         productType: productType,
@@ -90,17 +92,21 @@ const createCheckoutSession = async (req, res) => {
 const handleWebhook = async (req, res) => {
   try {
     const signature = req.headers["paddle-signature"];
-
     if (!signature) {
       return res.status(400).json({ error: "Missing signature" });
     }
 
-    // Verify webhook signature
-    const event = paddle.webhooks.verify({
-      body: req.body,
-      signature: signature,
-      secret: process.env.PADDLE_WEBHOOK_SECRET,
-    });
+    // req.body is raw Buffer because of express.raw; convert to string
+    const rawBody = Buffer.isBuffer(req.body)
+      ? req.body.toString("utf8")
+      : JSON.stringify(req.body);
+
+    // Verify and parse webhook
+    const event = await paddle.webhooks.unmarshal(
+      rawBody,
+      process.env.PADDLE_WEBHOOK_SECRET,
+      signature
+    );
 
     console.log("Webhook received:", event.eventType);
 

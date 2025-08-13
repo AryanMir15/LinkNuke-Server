@@ -41,8 +41,15 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions)); // Handle preflight
 
+// Special raw body parser for Paddle webhooks (must be before express.json)
+app.use("/api/v1/paddle/webhook", express.raw({ type: "application/json" }));
+
 // ========== Middleware ==========
-app.use(express.json());
+// Skip JSON parsing for Paddle webhook route to preserve raw body for signature verification
+app.use((req, res, next) => {
+  if (req.originalUrl === "/api/v1/paddle/webhook") return next();
+  return express.json()(req, res, next);
+});
 app.use(cookieParser());
 app.use(
   session({
