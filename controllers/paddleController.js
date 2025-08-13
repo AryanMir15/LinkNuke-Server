@@ -1,7 +1,7 @@
 const { Paddle, Environment } = require("@paddle/paddle-node-sdk");
 const User = require("../models/User");
 
-// Validate required environment variables
+// Validate required environment variables (but don't crash the app)
 const requiredEnvVars = [
   "PADDLE_API_KEY",
   "PADDLE_STARTER_PRICE_ID",
@@ -14,24 +14,32 @@ const missingEnvVars = requiredEnvVars.filter(
   (varName) => !process.env[varName]
 );
 if (missingEnvVars.length > 0) {
-  console.error("Missing required environment variables:", missingEnvVars);
-  throw new Error(
-    `Missing required environment variables: ${missingEnvVars.join(", ")}`
+  console.warn("Missing Paddle environment variables:", missingEnvVars);
+  console.warn(
+    "Paddle checkout functionality will not work until these are configured."
   );
 }
 
-// Initialize Paddle client
-const paddle = new Paddle(process.env.PADDLE_API_KEY, {
-  environment:
-    process.env.PADDLE_ENV === "sandbox"
-      ? Environment.sandbox
-      : Environment.production,
-});
-
-console.log(
-  "Paddle initialized with environment:",
-  process.env.PADDLE_ENV || "production"
-);
+// Initialize Paddle client only if API key is available
+let paddle = null;
+if (process.env.PADDLE_API_KEY) {
+  try {
+    paddle = new Paddle(process.env.PADDLE_API_KEY, {
+      environment:
+        process.env.PADDLE_ENV === "sandbox"
+          ? Environment.sandbox
+          : Environment.production,
+    });
+    console.log(
+      "Paddle initialized with environment:",
+      process.env.PADDLE_ENV || "production"
+    );
+  } catch (error) {
+    console.error("Failed to initialize Paddle client:", error);
+  }
+} else {
+  console.warn("PADDLE_API_KEY not found. Paddle functionality disabled.");
+}
 
 // Product/Price mapping
 const PRODUCTS = {
@@ -67,6 +75,15 @@ const createCheckoutSession = async (req, res) => {
     console.log("User ID:", userId);
     console.log("Product Type:", productType);
 
+    // Check if Paddle is initialized
+    if (!paddle) {
+      console.error("Paddle client not initialized");
+      return res.status(503).json({
+        error:
+          "Payment service is currently unavailable. Please try again later.",
+      });
+    }
+
     if (!PRODUCTS[productType]) {
       console.error("Invalid product type:", productType);
       return res.status(400).json({ error: "Invalid product type" });
@@ -74,6 +91,14 @@ const createCheckoutSession = async (req, res) => {
 
     const product = PRODUCTS[productType];
     console.log("Product config:", product);
+
+    // Check if product has a valid priceId
+    if (!product.priceId) {
+      console.error("Missing priceId for product:", productType);
+      return res.status(500).json({
+        error: "Product configuration error. Please contact support.",
+      });
+    }
 
     // Get full user object from database
     const user = await User.findById(userId);
@@ -141,6 +166,11 @@ const createCheckoutSession = async (req, res) => {
 // Handle webhooks
 const handleWebhook = async (req, res) => {
   try {
+    if (!paddle) {
+      console.error("Paddle client not initialized for webhook");
+      return res.status(503).json({ error: "Payment service unavailable" });
+    }
+
     const signature = req.headers["paddle-signature"];
     if (!signature) {
       return res.status(400).json({ error: "Missing signature" });
@@ -319,6 +349,13 @@ const getSubscriptionStatus = async (req, res) => {
 // Cancel subscription
 const cancelSubscription = async (req, res) => {
   try {
+    if (!paddle) {
+      console.error(
+        "Paddle client not initialized for subscription cancellation"
+      );
+      return res.status(503).json({ error: "Payment service unavailable" });
+    }
+
     const user = req.user;
 
     if (!user.subscription?.subscriptionId) {
@@ -342,6 +379,11 @@ const cancelSubscription = async (req, res) => {
 // Update subscription
 const updateSubscription = async (req, res) => {
   try {
+    if (!paddle) {
+      console.error("Paddle client not initialized for subscription update");
+      return res.status(503).json({ error: "Payment service unavailable" });
+    }
+
     const { newPlan } = req.body;
     const user = req.user;
 
