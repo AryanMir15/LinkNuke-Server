@@ -147,6 +147,7 @@ const createCheckoutSession = async (req, res) => {
       res.json({
         checkoutUrl: transaction.checkout.url,
         transactionId: transaction.id,
+        originalCheckoutUrl: transaction.checkout.url, // Keep the original URL for fallback
       });
     } catch (transactionError) {
       console.error("Transaction creation failed:", transactionError);
@@ -203,6 +204,7 @@ const createCheckoutSession = async (req, res) => {
           res.json({
             checkoutUrl: transaction.checkout.url,
             transactionId: transaction.id,
+            originalCheckoutUrl: transaction.checkout.url, // Keep the original URL for fallback
           });
         } catch (customerError) {
           console.error("Customer creation also failed:", customerError);
@@ -494,6 +496,7 @@ const getClientToken = async (req, res) => {
 
     // Generate a client token for the user
     const clientToken = await paddle.clientTokens.create({
+      name: "LinkNuke Checkout",
       expiresIn: 3600, // 1 hour
     });
 
