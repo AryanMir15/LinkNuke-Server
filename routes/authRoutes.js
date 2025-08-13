@@ -2,6 +2,7 @@ const express = require("express");
 const passport = require("passport");
 const router = express.Router();
 const { googleAuthCallback } = require("../controllers/auth");
+const authMiddleware = require("../middleware/auth");
 
 router.get(
   "/auth/google",
@@ -39,5 +40,22 @@ router.get(
     }
   }
 );
+
+// Get current user details
+router.get("/auth/me", authMiddleware, (req, res) => {
+  try {
+    const user = req.user;
+    res.json({
+      _id: user._id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      subscription: user.subscription,
+    });
+  } catch (error) {
+    console.error("Error getting user details:", error);
+    res.status(500).json({ error: "Failed to get user details" });
+  }
+});
 
 module.exports = router;
