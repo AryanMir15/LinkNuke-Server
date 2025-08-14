@@ -207,6 +207,16 @@ const handleWebhook = async (req, res) => {
       signature
     );
 
+    console.log("Webhook Verification:", {
+      eventType: event?.eventType,
+      verified: !!event,
+      customerId: event?.data?.customerId,
+      passthrough: event?.data?.passthrough
+        ? JSON.parse(event.data.passthrough)
+        : null,
+      receivedAt: new Date().toISOString(),
+    });
+
     console.log("Webhook received:", event.eventType);
 
     switch (event.eventType) {
