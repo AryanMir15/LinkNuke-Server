@@ -258,7 +258,13 @@ const handleTransactionCompleted = async (data) => {
       return;
     }
 
-    // Update user subscription status
+    // Update user subscription status with plan limits
+    const planLimits = {
+      starter: { links: 10, customDomains: 1 },
+      pro: { links: 50, customDomains: 3 },
+      lifetime: { links: 9999, customDomains: 10 },
+    };
+
     user.subscription = {
       status: "active",
       plan: customData.productType,
@@ -268,8 +274,15 @@ const handleTransactionCompleted = async (data) => {
       endDate:
         customData.productType === "lifetime"
           ? null
-          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days for monthly plans
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      usageLimits: planLimits[customData.productType],
+      isTrial: false,
+      trialDays: 0,
     };
+
+    // Initialize usage counters
+    user.usage.linksCreated = 0;
+    user.usage.storageUsed = 0;
 
     await user.save();
     console.log(`User ${userId} subscription activated`);

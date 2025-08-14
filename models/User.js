@@ -47,6 +47,10 @@ const UserSchema = new mongoose.Schema(
         enum: ["starter", "pro", "lifetime"],
         default: null,
       },
+      usageLimits: {
+        links: { type: Number, default: 10 },
+        customDomains: { type: Number, default: 1 },
+      },
       subscriptionId: String,
       transactionId: String,
       customerId: String,

@@ -1,5 +1,6 @@
 const express = require("express");
 const authMiddleware = require("../middleware/auth");
+const { checkSubscription, trackUsage } = require("../middleware/subscription");
 const {
   createLink,
   getAllLinks,
@@ -14,7 +15,13 @@ const router = express.Router();
 router.delete("/links/:id", authMiddleware, deleteLink);
 router.post("/links/track/:id", trackLinkView);
 router.get("/links/:id", authMiddleware, getSingleLink);
-router.post("/links", authMiddleware, createLink);
+router.post(
+  "/links",
+  authMiddleware,
+  checkSubscription(),
+  trackUsage("link"),
+  createLink
+);
 router.get("/links", authMiddleware, getAllLinks);
 router.patch("/links/:id", authMiddleware, updateLink);
 // Public route for preview and sharing
