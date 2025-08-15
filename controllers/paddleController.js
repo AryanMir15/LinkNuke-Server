@@ -120,6 +120,12 @@ const createCheckoutSession = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
+    if (!user.isVerified) {
+      return res.status(403).json({
+        error: "Email must be verified before purchasing a subscription",
+      });
+    }
+
     console.log("User found:", user.email);
 
     // Use hosted checkout approach

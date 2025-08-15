@@ -1,7 +1,7 @@
 const express = require("express");
 const passport = require("passport");
 const router = express.Router();
-const { googleAuthCallback } = require("../controllers/auth");
+const { googleAuthCallback, verifyToken } = require("../controllers/auth");
 const authMiddleware = require("../middleware/auth");
 
 router.get(
@@ -57,5 +57,8 @@ router.get("/auth/me", authMiddleware, (req, res) => {
     res.status(500).json({ error: "Failed to get user details" });
   }
 });
+
+// Token verification endpoint
+router.get("/auth/verify-token", authMiddleware, verifyToken);
 
 module.exports = router;

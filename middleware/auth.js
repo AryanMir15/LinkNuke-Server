@@ -1,7 +1,8 @@
 const jwt = require("jsonwebtoken");
+const User = require("../models/User");
 const { UnauthenticatedError } = require("../errors");
 
-const authMiddleware = (req, res, next) => {
+const authMiddleware = async (req, res, next) => {
   // Validate authorization header format
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {
@@ -16,13 +17,17 @@ const authMiddleware = (req, res, next) => {
 
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET, {
-      algorithms: ["HS256"], // Explicitly specify algorithm
-      ignoreExpiration: false, // Validate expiration
+      algorithms: ["HS256"],
+      ignoreExpiration: false,
     });
 
+    const user = await User.findById(payload.userId).select("isVerified");
+    if (!user) throw new UnauthenticatedError("User not found");
+    if (!user.isVerified) throw new UnauthenticatedError("Email not verified");
+
     req.user = {
-      _id: payload.userId,
-      name: payload.name,
+      _id: user._id,
+      verified: user.isVerified,
     };
 
     next();

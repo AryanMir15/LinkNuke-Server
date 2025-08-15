@@ -66,6 +66,7 @@ const register = async (req, res) => {
       verified: false,
       message: "Verification PIN sent to email",
       email: user.email,
+      requiresVerification: true,
     });
   } catch (error) {
     console.error("Error during registration:", error);
@@ -257,6 +258,10 @@ const resendPin = async (req, res) => {
   }
 };
 
+const verifyToken = async (req, res) => {
+  res.json({ valid: true });
+};
+
 module.exports = {
   register,
   login,
@@ -264,4 +269,5 @@ module.exports = {
   resetPassword,
   verifyPin,
   resendPin,
+  verifyToken,
 };
