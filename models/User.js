@@ -40,12 +40,12 @@ const UserSchema = new mongoose.Schema(
       status: {
         type: String,
         enum: ["active", "cancelled", "paused", "past_due"],
-        default: null,
+        default: "cancelled",
       },
       plan: {
         type: String,
         enum: ["starter", "pro", "lifetime"],
-        default: null,
+        default: "starter",
       },
       usageLimits: {
         links: { type: Number, default: 10 },
