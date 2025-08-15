@@ -39,13 +39,13 @@ const UserSchema = new mongoose.Schema(
     subscription: {
       status: {
         type: String,
-        enum: ["active", "cancelled", "paused", "past_due"],
-        default: "cancelled",
+        enum: ["active", "inactive"],
+        default: "active",
       },
       plan: {
         type: String,
-        enum: ["starter", "pro", "lifetime"],
-        default: "starter",
+        enum: ["free", "pro", "lifetime"],
+        default: "free",
       },
       usageLimits: {
         links: { type: Number, default: 10 },

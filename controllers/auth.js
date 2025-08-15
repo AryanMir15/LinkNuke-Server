@@ -52,12 +52,20 @@ const register = async (req, res) => {
       password,
       verificationPin,
       pinExpires,
+      subscription: {
+        status: "inactive",
+        plan: "free",
+        usageLimits: { links: 10, customDomains: 1 },
+      },
     });
 
     await sendVerificationPin({ email: user.email, pin: verificationPin });
 
     res.status(201).json({
-      message: "User registered. Verification PIN sent to email.",
+      success: true,
+      verified: false,
+      message: "Verification PIN sent to email",
+      email: user.email,
     });
   } catch (error) {
     console.error("Error during registration:", error);
@@ -198,9 +206,22 @@ const verifyPin = async (req, res) => {
   user.verificationPin = undefined;
   user.pinExpires = undefined;
   user.isVerified = true;
+  user.subscription.status = "active";
   await user.save();
 
-  res.status(200).json({ message: "Email verified successfully" });
+  const token = user.createJWT();
+
+  res.status(200).json({
+    success: true,
+    verified: true,
+    message: "Email verified successfully",
+    token,
+    user: {
+      firstName: user.firstName,
+      email: user.email,
+      subscription: user.subscription,
+    },
+  });
 };
 
 const resendPin = async (req, res) => {
