@@ -195,17 +195,25 @@ const handleWebhook = async (req, res) => {
       return res.status(400).json({ error: "Missing signature" });
     }
 
-    // req.body is raw Buffer because of express.raw; convert to string
+    // Convert raw body to string for verification
     const rawBody = Buffer.isBuffer(req.body)
       ? req.body.toString("utf8")
       : JSON.stringify(req.body);
 
-    // Verify and parse webhook
+    // Verify webhook signature
     const event = await paddle.webhooks.unmarshal(
       rawBody,
       process.env.PADDLE_WEBHOOK_SECRET,
       signature
     );
+
+    console.log("Webhook verified:", {
+      eventType: event.eventType,
+      customerId: event.data.customer_id,
+      passthrough: event.data.passthrough
+        ? JSON.parse(event.data.passthrough)
+        : null,
+    });
 
     console.log("Webhook Verification:", {
       eventType: event?.eventType,
@@ -254,11 +262,15 @@ const handleWebhook = async (req, res) => {
 // Webhook handlers
 const handleTransactionCompleted = async (data) => {
   try {
-    const { customerId, customData } = data;
-    const userId = customData?.userId;
+    console.log("Processing transaction:", data.id);
+
+    const passthrough = data.passthrough ? JSON.parse(data.passthrough) : {};
+    const userId = passthrough.userId;
+    const productType = passthrough.productType;
+    const customerId = data.customer_id;
 
     if (!userId) {
-      console.error("No userId in transaction data");
+      console.error("No userId in transaction passthrough data");
       return;
     }
 
@@ -277,15 +289,15 @@ const handleTransactionCompleted = async (data) => {
 
     user.subscription = {
       status: "active",
-      plan: customData.productType,
+      plan: productType,
       transactionId: data.id,
       customerId: customerId,
-      startDate: new Date(),
+      startDate: new Date(data.effective_at),
       endDate:
-        customData.productType === "lifetime"
+        productType === "lifetime"
           ? null
-          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      usageLimits: planLimits[customData.productType],
+          : new Date(data.billing_period.end_date),
+      usageLimits: planLimits[productType],
       isTrial: false,
       trialDays: 0,
     };
