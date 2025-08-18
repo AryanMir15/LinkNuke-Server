@@ -66,7 +66,7 @@ const register = async (req, res) => {
       verified: false,
       message: "Verification PIN sent to email",
       email: user.email,
-      requiresVerification: true,
+      requiresVerification: true, // Signal frontend to redirect
     });
   } catch (error) {
     console.error("Error during registration:", error);
