@@ -102,7 +102,12 @@ const createLink = async (req, res) => {
     const link = new Link(linkData);
     await link.save();
 
-    console.log("Link saved successfully:", link._id);
+    // Update user's link count
+    await User.findByIdAndUpdate(userId, {
+      $inc: { "usage.linksCreated": 1 },
+    });
+
+    console.log("Link saved and usage updated:", link._id);
 
     res.status(201).json({
       message: "Link created successfully",
