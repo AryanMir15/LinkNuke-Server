@@ -34,7 +34,11 @@ const createLink = async (req, res) => {
       }
     }
 
-    console.log("Creating link with body:", req.body);
+    const cleanBody = Object.keys(req.body).reduce((acc, key) => {
+      if (req.body[key] !== undefined) acc[key] = req.body[key];
+      return acc;
+    }, {});
+    console.log("Creating link with body:", cleanBody);
 
     const {
       title,
