@@ -9,6 +9,7 @@ const {
   updateLink,
   deleteLink,
   getLinkByLinkId,
+  getUsageStats,
 } = require("../controllers/linkController");
 const router = express.Router();
 
@@ -23,6 +24,7 @@ router.post(
   createLink
 );
 router.get("/links", authMiddleware, getAllLinks);
+router.get("/links/usage-stats", authMiddleware, getUsageStats);
 router.patch("/links/:id", authMiddleware, updateLink);
 // Public route for preview and sharing
 router.get("/public/links/:linkId", getLinkByLinkId);

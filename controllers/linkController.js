@@ -160,6 +160,34 @@ const getAllLinks = async (req, res) => {
   }
 };
 
+// Get usage statistics
+const getUsageStats = asyncHandler(async (req, res) => {
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+
+  const stats = await Link.aggregate([
+    {
+      $match: {
+        userId: req.user._id,
+        createdAt: { $gte: startOfMonth },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        monthlyTotal: { $sum: 1 },
+        allTimeTotal: { $sum: 1 },
+      },
+    },
+  ]);
+
+  res.status(200).json({
+    monthlyTotal: stats[0]?.monthlyTotal || 0,
+    allTimeTotal: await Link.countDocuments({ userId: req.user._id }),
+  });
+});
+
 // Get single link
 const getSingleLink = async (req, res) => {
   try {
