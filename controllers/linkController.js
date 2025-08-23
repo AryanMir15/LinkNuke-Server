@@ -25,6 +25,15 @@ const {
 // Create a new link
 const createLink = async (req, res) => {
   try {
+    // Idempotency key handling
+    const idempotencyKey = req.headers["idempotency-key"];
+    if (idempotencyKey) {
+      const cachedResponse = await redis.get(`idempotency:${idempotencyKey}`);
+      if (cachedResponse) {
+        return res.status(409).json(JSON.parse(cachedResponse));
+      }
+    }
+
     console.log("Creating link with body:", req.body);
 
     const {
@@ -109,7 +118,7 @@ const createLink = async (req, res) => {
 
     console.log("Link saved and usage updated:", link._id);
 
-    res.status(201).json({
+    const responsePayload = {
       message: "Link created successfully",
       link: {
         _id: link._id,
@@ -120,7 +129,19 @@ const createLink = async (req, res) => {
         status: link.status,
         createdAt: link.createdAt,
       },
-    });
+    };
+
+    // Cache successful response if idempotency key exists
+    if (idempotencyKey) {
+      await redis.set(
+        `idempotency:${idempotencyKey}`,
+        JSON.stringify(responsePayload),
+        "EX",
+        30 // 30 second TTL
+      );
+    }
+
+    res.status(201).json(responsePayload);
   } catch (error) {
     console.error("Error creating link:", error);
     console.error("Error stack:", error.stack);

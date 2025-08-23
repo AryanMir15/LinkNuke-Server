@@ -76,6 +76,24 @@ const UserSchema = new mongoose.Schema(
         default: 0, // in bytes
       },
     },
+    dailyUsage: {
+      lastReset: {
+        type: Date,
+        default: Date.now,
+      },
+      links: {
+        type: Number,
+        default: 0,
+      },
+      files: {
+        type: Number,
+        default: 0,
+      },
+      storage: {
+        type: Number,
+        default: 0,
+      },
+    },
   },
 
   {
@@ -102,6 +120,22 @@ UserSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
+  next();
+});
+
+UserSchema.pre("save", function (next) {
+  const now = new Date();
+  if (
+    !this.dailyUsage?.lastReset ||
+    new Date(this.dailyUsage.lastReset).toDateString() !== now.toDateString()
+  ) {
+    this.dailyUsage = {
+      lastReset: now,
+      links: 0,
+      files: 0,
+      storage: 0,
+    };
+  }
   next();
 });
 
