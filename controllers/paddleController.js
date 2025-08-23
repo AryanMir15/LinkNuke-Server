@@ -396,9 +396,37 @@ const getSubscriptionStatus = async (req, res) => {
       });
     }
 
+    // Calculate usage percentage
+    const usage = user.subscription.usageLimits
+      ? {
+          links: {
+            current: user.usage.linksCreated,
+            limit: user.subscription.usageLimits.links,
+            percent: Math.round(
+              (user.usage.linksCreated / user.subscription.usageLimits.links) *
+                100
+            ),
+          },
+        }
+      : null;
+
+    // Extract billing period dates
+    const billingPeriod = user.subscription.endDate
+      ? {
+          start: user.subscription.startDate,
+          end: user.subscription.endDate,
+          remaining_days: Math.ceil(
+            (user.subscription.endDate - Date.now()) / (1000 * 60 * 60 * 24)
+          ),
+        }
+      : null;
+
     res.json({
       hasSubscription: true,
       subscription: user.subscription,
+      usage,
+      billing_period: billingPeriod,
+      proration: user.subscription.prorationData || null,
     });
   } catch (error) {
     console.error("Error getting subscription status:", error);
