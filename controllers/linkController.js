@@ -197,7 +197,7 @@ const getUsageStats = asyncHandler(async (req, res) => {
   const stats = await Link.aggregate([
     {
       $match: {
-        userId: req.user._id,
+        userId: mongoose.Types.ObjectId(req.user._id),
         createdAt: { $gte: startOfMonth },
       },
     },
@@ -205,10 +205,13 @@ const getUsageStats = asyncHandler(async (req, res) => {
       $group: {
         _id: null,
         monthlyTotal: { $sum: 1 },
-        allTimeTotal: { $sum: 1 },
       },
     },
   ]);
+
+  const allTimeTotal = await Link.countDocuments({
+    userId: mongoose.Types.ObjectId(req.user._id),
+  });
 
   res.status(200).json({
     monthlyTotal: stats[0]?.monthlyTotal || 0,
