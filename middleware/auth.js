@@ -26,7 +26,7 @@ const authMiddleware = async (req, res, next) => {
     if (!user.isVerified) throw new UnauthenticatedError("Email not verified");
 
     req.user = {
-      _id: user._id,
+      _id: mongoose.Types.ObjectId(user._id),
       verified: user.isVerified,
     };
 

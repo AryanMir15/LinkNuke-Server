@@ -191,33 +191,51 @@ const asyncHandler = (fn) => (req, res, next) =>
 
 // Get usage statistics
 const getUsageStats = asyncHandler(async (req, res) => {
-  const startOfMonth = new Date();
-  startOfMonth.setDate(1);
-  startOfMonth.setHours(0, 0, 0, 0);
+  try {
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
 
-  const stats = await Link.aggregate([
-    {
-      $match: {
-        userId: mongoose.Types.ObjectId(req.user._id),
-        createdAt: { $gte: startOfMonth },
+    // Explicitly convert user ID to string
+    const userId = req.user._id.toString();
+
+    console.log("[Usage Stats] User ID:", userId);
+    console.log("[Usage Stats] User ID type:", typeof userId);
+
+    const stats = await Link.aggregate([
+      {
+        $match: {
+          userId: mongoose.Types.ObjectId(userId),
+          createdAt: { $gte: startOfMonth },
+        },
       },
-    },
-    {
-      $group: {
-        _id: null,
-        monthlyTotal: { $sum: 1 },
+      {
+        $group: {
+          _id: null,
+          monthlyTotal: { $sum: 1 },
+        },
       },
-    },
-  ]);
+    ]);
 
-  const allTimeTotal = await Link.countDocuments({
-    userId: mongoose.Types.ObjectId(req.user._id),
-  });
+    console.log("[Usage Stats] Aggregation result:", stats);
 
-  res.status(200).json({
-    monthlyTotal: stats[0]?.monthlyTotal || 0,
-    allTimeTotal: await Link.countDocuments({ userId: req.user._id }),
-  });
+    const allTimeTotal = await Link.countDocuments({
+      userId: mongoose.Types.ObjectId(userId),
+    });
+    console.log("[Usage Stats] All time total:", allTimeTotal);
+
+    res.status(200).json({
+      monthlyTotal: stats[0]?.monthlyTotal || 0,
+      allTimeTotal: allTimeTotal,
+    });
+  } catch (error) {
+    console.error("[Usage Stats Error]", error);
+    console.error("Error stack:", error.stack);
+    res.status(500).json({
+      error: "Failed to fetch stats",
+      details: error.message,
+    });
+  }
 });
 
 // Get single link
