@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const mongoose = require("mongoose");
 const dayjs = require("dayjs");
 const customParseFormat = require("dayjs/plugin/customParseFormat.js");
 const paddle = require("@paddle/paddle-node-sdk");
@@ -235,8 +236,30 @@ const getSingleLink = async (req, res) => {
 const trackLinkView = async (req, res) => {
   try {
     const { linkId } = req.params;
+    const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
     const link = await Link.findOne({ linkId });
     if (!link) return res.status(404).json({ error: "Link not found" });
+
+    // Prevent duplicate views from same IP
+    if (link.viewersIPs?.includes(ip)) {
+      return res.json({ success: true }); // Don't count but still return success
+    }
+
+    // Check view limits and expiration
+    if (link.views >= (link.maxViews || 0)) {
+      link.status = "Expired";
+      await link.save();
+      return res
+        .status(410)
+        .json({ success: false, error: "View limit reached" });
+    }
+
+    if (new Date() > new Date(link.expiresAt)) {
+      link.status = "Expired";
+      await link.save();
+      return res.status(410).json({ success: false, error: "Link expired" });
+    }
+
     link.views = (link.views || 0) + 1;
     await link.save();
     res.json({ success: true });
