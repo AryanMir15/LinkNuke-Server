@@ -1,5 +1,25 @@
 const app = require("express");
 const User = require("../models/User");
+
+const verifyToken = async (req, res) => {
+  try {
+    // User is already verified by auth middleware
+    const user = await User.findById(req.user._id).select(
+      "-password -__v -createdAt -updatedAt"
+    );
+
+    res.json({
+      user,
+      valid: true,
+    });
+  } catch (error) {
+    console.error("Token verification error:", error);
+    res.status(500).json({
+      error: "Token verification failed",
+      valid: false,
+    });
+  }
+};
 const crypto = require("crypto");
 const { sendResetEmail } = require("../utils/sendResetEmail");
 const { sendVerificationPin } = require("../utils/sendVerificationPin");
@@ -258,9 +278,7 @@ const resendPin = async (req, res) => {
   }
 };
 
-const verifyToken = async (req, res) => {
-  res.json({ valid: true });
-};
+// (Remove this duplicate implementation)
 
 module.exports = {
   register,
