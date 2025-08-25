@@ -4,19 +4,25 @@ const { ForbiddenError } = require("../errors");
 const checkSubscription = (requiredPlan) => async (req, res, next) => {
   const user = await User.findById(req.user._id);
 
-  // Check active subscription
-  if (!user.subscription || user.subscription.status !== "active") {
-    throw new ForbiddenError("Active subscription required");
+  // Allow free users to create links within their limits
+  if (!user.subscription) {
+    // Set default subscription for users without one
+    user.subscription = {
+      status: "active",
+      plan: "free",
+      usageLimits: { links: 10, customDomains: 1 },
+    };
+    await user.save();
   }
 
-  // Check plan tier
-  if (requiredPlan && user.subscription.plan !== requiredPlan) {
-    throw new ForbiddenError(`${requiredPlan} plan required`);
-  }
-
-  // Check usage limits
+  // Check if user has reached their link limit
   if (user.usage.linksCreated >= user.subscription.usageLimits.links) {
     throw new ForbiddenError("Link creation limit exceeded");
+  }
+
+  // Only check for specific plan requirements if specified
+  if (requiredPlan && user.subscription.plan !== requiredPlan) {
+    throw new ForbiddenError(`${requiredPlan} plan required`);
   }
 
   next();

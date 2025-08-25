@@ -95,7 +95,7 @@ LinkSchema.pre("save", function (next) {
 
   // Generate url if not provided
   if (!this.url) {
-    this.url = `${process.env.CLIENT_URL || "http://localhost:3000"}/l/${
+    this.url = `${process.env.CLIENT_URL || "http://localhost:3000"}/preview/${
       this.linkId
     }`;
   }
@@ -112,7 +112,7 @@ LinkSchema.pre("validate", function (next) {
 
   // Generate url if not provided
   if (!this.url) {
-    this.url = `${process.env.CLIENT_URL || "http://localhost:3000"}/l/${
+    this.url = `${process.env.CLIENT_URL || "http://localhost:3000"}/preview/${
       this.linkId
     }`;
   }

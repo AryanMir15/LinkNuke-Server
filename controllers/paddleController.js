@@ -389,21 +389,33 @@ const getSubscriptionStatus = async (req, res) => {
   try {
     const user = req.user;
 
+    // Ensure user has subscription and usage data
     if (!user.subscription) {
-      return res.json({
-        hasSubscription: false,
-        subscription: null,
-      });
+      user.subscription = {
+        status: "active",
+        plan: "free",
+        usageLimits: { links: 10, customDomains: 1 },
+      };
+      await user.save();
+    }
+
+    if (!user.usage) {
+      user.usage = {
+        linksCreated: 0,
+        storageUsed: 0,
+      };
+      await user.save();
     }
 
     // Calculate usage percentage
     const usage = user.subscription.usageLimits
       ? {
           links: {
-            current: user.usage.linksCreated,
+            current: user.usage.linksCreated || 0,
             limit: user.subscription.usageLimits.links,
             percent: Math.round(
-              (user.usage.linksCreated / user.subscription.usageLimits.links) *
+              ((user.usage.linksCreated || 0) /
+                user.subscription.usageLimits.links) *
                 100
             ),
           },

@@ -26,13 +26,11 @@ const {
 // Create a new link
 const createLink = async (req, res) => {
   try {
-    // Idempotency key handling
+    // Idempotency key handling (removed redis dependency for now)
     const idempotencyKey = req.headers["idempotency-key"];
     if (idempotencyKey) {
-      const cachedResponse = await redis.get(`idempotency:${idempotencyKey}`);
-      if (cachedResponse) {
-        return res.status(409).json(JSON.parse(cachedResponse));
-      }
+      // TODO: Implement proper idempotency with redis
+      console.log("Idempotency key received:", idempotencyKey);
     }
 
     const cleanBody = Object.keys(req.body).reduce((acc, key) => {
@@ -116,34 +114,32 @@ const createLink = async (req, res) => {
     const link = new Link(linkData);
     await link.save();
 
-    // Update user's link count
-    await User.findByIdAndUpdate(userId, {
-      $inc: { "usage.linksCreated": 1 },
-    });
-
-    console.log("Link saved and usage updated:", link._id);
+    // Usage is updated by the trackUsage middleware
+    console.log("Link saved successfully:", link._id);
 
     const responsePayload = {
-      message: "Link created successfully",
-      link: {
-        _id: link._id,
-        title: link.title,
-        format: link.format,
-        linkId: link.linkId,
-        url: link.url,
-        status: link.status,
-        createdAt: link.createdAt,
-      },
+      _id: link._id,
+      title: link.title,
+      format: link.format,
+      linkId: link.linkId,
+      url: link.url,
+      status: link.status,
+      createdAt: link.createdAt,
+      expiresAt: link.expiresAt,
+      maxViews: link.maxViews,
+      views: link.views,
+      extraSecure: link.extraSecure,
+      text: link.text,
+      imageUrl: link.imageUrl,
+      videoUrl: link.videoUrl,
+      audioUrl: link.audioUrl,
+      documentUrl: link.documentUrl,
     };
 
     // Cache successful response if idempotency key exists
     if (idempotencyKey) {
-      await redis.set(
-        `idempotency:${idempotencyKey}`,
-        JSON.stringify(responsePayload),
-        "EX",
-        30 // 30 second TTL
-      );
+      // TODO: Implement proper idempotency with redis
+      console.log("Idempotency key received:", idempotencyKey);
     }
 
     res.status(201).json(responsePayload);
@@ -180,7 +176,7 @@ const getAllLinks = async (req, res) => {
     const links = await Link.find({ userId: req.user._id }).sort({
       createdAt: -1,
     });
-    res.json({ links });
+    res.json(links); // Return links array directly
   } catch (error) {
     res.status(500).json({ error: "Something went wrong" });
   }
@@ -253,9 +249,9 @@ const getSingleLink = async (req, res) => {
 // Track link view
 const trackLinkView = async (req, res) => {
   try {
-    const { linkId } = req.params;
+    const { id } = req.params; // Changed from linkId to id to match route
     const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
-    const link = await Link.findOne({ linkId });
+    const link = await Link.findById(id); // Use findById instead of findOne with linkId
     if (!link) return res.status(404).json({ error: "Link not found" });
 
     // Prevent duplicate views from same IP
@@ -272,7 +268,7 @@ const trackLinkView = async (req, res) => {
         .json({ success: false, error: "View limit reached" });
     }
 
-    if (new Date() > new Date(link.expiresAt)) {
+    if (link.expiresAt && new Date() > new Date(link.expiresAt)) {
       link.status = "Expired";
       await link.save();
       return res.status(410).json({ success: false, error: "Link expired" });
@@ -323,7 +319,7 @@ const getLinkByLinkId = async (req, res) => {
     const { linkId } = req.params;
     const link = await Link.findOne({ linkId });
     if (!link) return res.status(404).json({ error: "Link not found" });
-    res.json({ link });
+    res.json(link); // Return link object directly
   } catch (error) {
     res.status(500).json({ error: "Something went wrong" });
   }

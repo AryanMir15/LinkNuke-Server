@@ -130,7 +130,7 @@ const login = async (req, res) => {
         lastName: user.lastName,
         email: user.email,
       },
-      token,
+      accessToken: token, // Return accessToken to match client expectation
     });
   } catch (error) {
     console.error("Login error:", error);
