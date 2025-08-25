@@ -122,15 +122,19 @@ const login = async (req, res) => {
         .json({ error: "Please provide valid credentials" });
     }
 
-    const token = user.createJWT();
+    req.login(user, (err) => {
+      if (err) {
+        console.error("Login session error:", err);
+        return res.status(500).json({ error: "Session initialization failed" });
+      }
 
-    res.status(200).json({
-      user: {
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-      },
-      accessToken: token, // Return accessToken to match client expectation
+      res.status(200).json({
+        user: {
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+        },
+      });
     });
   } catch (error) {
     console.error("Login error:", error);
