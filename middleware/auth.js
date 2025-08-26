@@ -2,12 +2,11 @@ const { UnauthenticatedError } = require("../errors");
 
 const authMiddleware = (req, res, next) => {
   if (!req.isAuthenticated()) {
-    throw new UnauthenticatedError("Authentication required");
+    return res.redirect("/login");
   }
 
-  // Verify email confirmation status directly from session user
   if (!req.user.isVerified) {
-    throw new UnauthenticatedError("Email not verified");
+    return res.redirect("/verify-email");
   }
 
   next();

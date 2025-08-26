@@ -128,12 +128,14 @@ const login = async (req, res) => {
         return res.status(500).json({ error: "Session initialization failed" });
       }
 
-      res.status(200).json({
-        user: {
-          firstName: user.firstName,
-          lastName: user.lastName,
-          email: user.email,
-        },
+      req.session.save(() => {
+        res.status(200).json({
+          user: {
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+          },
+        });
       });
     });
   } catch (error) {
