@@ -284,11 +284,29 @@ const resendPin = async (req, res) => {
   }
 };
 
-// (Remove this duplicate implementation)
+const logout = async (req, res) => {
+  req.logout((err) => {
+    if (err) {
+      console.error("Logout error:", err);
+      return res.status(500).json({ error: "Logout failed" });
+    }
+
+    req.session.destroy((err) => {
+      if (err) {
+        console.error("Session destruction error:", err);
+        return res.status(500).json({ error: "Session cleanup failed" });
+      }
+
+      res.clearCookie("connect.sid");
+      res.status(200).json({ message: "Logged out successfully" });
+    });
+  });
+};
 
 module.exports = {
   register,
   login,
+  logout,
   forgotPassword,
   resetPassword,
   verifyPin,

@@ -4,6 +4,7 @@ const authMiddleware = require("../middleware/auth");
 const {
   login,
   register,
+  logout,
   forgotPassword,
   resetPassword,
   verifyPin,
@@ -13,6 +14,7 @@ const {
 
 router.post("/auth/register", register);
 router.post("/auth/login", login);
+router.post("/auth/logout", logout);
 router.post("/auth/forgot-password", forgotPassword);
 router.post("/auth/reset-password/:token", resetPassword);
 router.post("/auth/verify-pin", verifyPin);
