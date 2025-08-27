@@ -15,6 +15,7 @@ const router = express.Router();
 
 router.delete("/links/:id", authMiddleware, deleteLink);
 router.post("/links/track/:id", trackLinkView);
+router.get("/links/usage-stats", authMiddleware, getUsageStats);
 router.get("/links/:id", authMiddleware, getSingleLink);
 router.post(
   "/links",
@@ -24,7 +25,6 @@ router.post(
   createLink
 );
 router.get("/links", authMiddleware, getAllLinks);
-router.get("/links/usage-stats", authMiddleware, getUsageStats);
 router.patch("/links/:id", authMiddleware, updateLink);
 // Public route for preview and sharing
 router.get("/public/links/:linkId", getLinkByLinkId);
