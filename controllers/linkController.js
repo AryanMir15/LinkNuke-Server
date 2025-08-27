@@ -173,7 +173,10 @@ const createCheckoutSession = async (req, res) => {
 // Get all links
 const getAllLinks = async (req, res) => {
   try {
-    const links = await Link.find({ userId: req.user._id }).sort({
+    const links = await Link.find({
+      userId: req.user._id,
+      deleted: false,
+    }).sort({
       createdAt: -1,
     });
     res.json(links); // Return links array directly
@@ -210,6 +213,7 @@ const getUsageStats = asyncHandler(async (req, res) => {
         $match: {
           userId: mongoose.Types.ObjectId(userId),
           createdAt: { $gte: startOfMonth },
+          // Don't filter by deleted - count ALL links created this month
         },
       },
       {
@@ -225,6 +229,7 @@ const getUsageStats = asyncHandler(async (req, res) => {
     console.log("🔍🔍🔍 [Usage Stats] Starting countDocuments...");
     const allTimeTotal = await Link.countDocuments({
       userId: mongoose.Types.ObjectId(userId),
+      deleted: false, // Only count non-deleted links for all-time total
     });
     console.log("🔍🔍🔍 [Usage Stats] All time total:", allTimeTotal);
 
@@ -264,7 +269,11 @@ const getSingleLink = async (req, res) => {
       _id: id,
       userId: req.user._id,
     });
-    const link = await Link.findOne({ _id: id, userId: req.user._id });
+    const link = await Link.findOne({
+      _id: id,
+      userId: req.user._id,
+      deleted: false,
+    });
     console.log("🔍🔍🔍 Link found:", link ? "YES" : "NO");
 
     if (!link) {
@@ -286,7 +295,7 @@ const trackLinkView = async (req, res) => {
   try {
     const { id } = req.params; // Changed from linkId to id to match route
     const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
-    const link = await Link.findById(id); // Use findById instead of findOne with linkId
+    const link = await Link.findOne({ _id: id, deleted: false }); // Don't track deleted links
     if (!link) return res.status(404).json({ error: "Link not found" });
 
     // Prevent duplicate views from same IP
@@ -323,7 +332,7 @@ const updateLink = async (req, res) => {
     const { id } = req.params;
     const { title, description } = req.body;
     const link = await Link.findOneAndUpdate(
-      { _id: id, userId: req.user._id },
+      { _id: id, userId: req.user._id, deleted: false },
       { title, description },
       { new: true }
     );
@@ -338,7 +347,12 @@ const updateLink = async (req, res) => {
 const deleteLink = async (req, res) => {
   try {
     const { id } = req.params;
-    const link = await Link.findOneAndDelete({ _id: id, userId: req.user._id });
+    // Soft delete: mark as deleted instead of removing from database
+    const link = await Link.findOneAndUpdate(
+      { _id: id, userId: req.user._id, deleted: false },
+      { deleted: true },
+      { new: true }
+    );
     if (!link) return res.status(404).json({ error: "Link not found" });
     if (link.fileSize)
       await updateStorageUsage(req.user._id, link.fileSize, "remove");
@@ -352,7 +366,7 @@ const deleteLink = async (req, res) => {
 const getLinkByLinkId = async (req, res) => {
   try {
     const { linkId } = req.params;
-    const link = await Link.findOne({ linkId });
+    const link = await Link.findOne({ linkId, deleted: false });
     if (!link) return res.status(404).json({ error: "Link not found" });
     res.json(link); // Return link object directly
   } catch (error) {
