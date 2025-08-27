@@ -6,6 +6,7 @@ const rateLimit = require("express-rate-limit");
 
 // ========== External Packages ==========
 const session = require("express-session");
+const MongoStore = require("connect-mongo");
 const passport = require("passport");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
@@ -54,11 +55,16 @@ app.use(cookieParser());
 app.use(
   session({
     secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
+    resave: true,
+    saveUninitialized: true,
+    store: MongoStore.create({
+      mongoUrl: process.env.MONGO_URI,
+      collectionName: "sessions",
+      ttl: 24 * 60 * 60, // 24 hours
+    }),
     cookie: {
-      secure: true, // Always use secure in production (HTTPS)
-      sameSite: "none", // Required for cross-origin requests
+      secure: true,
+      sameSite: "none",
       httpOnly: true,
       maxAge: 1000 * 60 * 60 * 24,
     },
@@ -87,7 +93,8 @@ app.use((req, res, next) => {
   console.log("🔍🔍🔍 APP: Incoming request");
   console.log("🔍🔍🔍 APP: Method:", req.method);
   console.log("🔍🔍🔍 APP: URL:", req.originalUrl);
-  console.log("🔍🔍🔍 APP: Headers:", req.headers);
+  console.log("🔍🔍🔍 APP: Cookie header:", req.headers.cookie);
+  console.log("🔍🔍🔍 APP: All headers:", req.headers);
   next();
 });
 
