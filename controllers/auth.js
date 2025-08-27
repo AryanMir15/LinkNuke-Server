@@ -122,13 +122,27 @@ const login = async (req, res) => {
         .json({ error: "Please provide valid credentials" });
     }
 
+    console.log("🔍🔍🔍 LOGIN: About to call req.login with user:", {
+      id: user._id,
+      email: user.email,
+    });
+
     req.login(user, (err) => {
       if (err) {
-        console.error("Login session error:", err);
+        console.error("🔍🔍🔍 LOGIN: Login session error:", err);
         return res.status(500).json({ error: "Session initialization failed" });
       }
 
+      console.log("🔍🔍🔍 LOGIN: req.login successful");
+      console.log("🔍🔍🔍 LOGIN: req.session after login:", req.session);
+      console.log(
+        "🔍🔍🔍 LOGIN: req.user after login:",
+        req.user ? { id: req.user._id, email: req.user.email } : "NO USER"
+      );
+
       req.session.save(() => {
+        console.log("🔍🔍🔍 LOGIN: Session saved successfully");
+        console.log("🔍🔍🔍 LOGIN: Final session state:", req.session);
         res.status(200).json({
           user: {
             firstName: user.firstName,

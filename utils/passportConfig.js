@@ -4,14 +4,24 @@ const User = require("../models/User");
 
 // Serialization required for passport session management
 passport.serializeUser((user, done) => {
-  done(null, user.id);
+  console.log("🔍🔍🔍 PASSPORT: Serializing user:", {
+    id: user._id,
+    email: user.email,
+  });
+  done(null, user._id);
 });
 
 passport.deserializeUser(async (id, done) => {
+  console.log("🔍🔍🔍 PASSPORT: Deserializing user with ID:", id);
   try {
     const user = await User.findById(id);
+    console.log(
+      "🔍🔍🔍 PASSPORT: Deserialized user:",
+      user ? { id: user._id, email: user.email } : "NO USER"
+    );
     done(null, user);
   } catch (err) {
+    console.error("🔍🔍🔍 PASSPORT: Deserialization error:", err);
     done(err, null);
   }
 });
