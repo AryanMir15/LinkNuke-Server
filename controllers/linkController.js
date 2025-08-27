@@ -187,6 +187,11 @@ const asyncHandler = (fn) => (req, res, next) =>
 
 // Get usage statistics
 const getUsageStats = asyncHandler(async (req, res) => {
+  console.log("🔍🔍🔍 GET USAGE STATS FUNCTION START");
+  console.log("🔍🔍🔍 req.user:", req.user);
+  console.log("🔍🔍🔍 req.user._id:", req.user._id);
+  console.log("🔍🔍🔍 req.user._id type:", typeof req.user._id);
+
   try {
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
@@ -195,9 +200,11 @@ const getUsageStats = asyncHandler(async (req, res) => {
     // Explicitly convert user ID to string
     const userId = req.user._id.toString();
 
-    console.log("[Usage Stats] User ID:", userId);
-    console.log("[Usage Stats] User ID type:", typeof userId);
+    console.log("🔍🔍🔍 [Usage Stats] User ID:", userId);
+    console.log("🔍🔍🔍 [Usage Stats] User ID type:", typeof userId);
+    console.log("🔍🔍🔍 [Usage Stats] Start of month:", startOfMonth);
 
+    console.log("🔍🔍🔍 [Usage Stats] Starting aggregation...");
     const stats = await Link.aggregate([
       {
         $match: {
@@ -213,20 +220,28 @@ const getUsageStats = asyncHandler(async (req, res) => {
       },
     ]);
 
-    console.log("[Usage Stats] Aggregation result:", stats);
+    console.log("🔍🔍🔍 [Usage Stats] Aggregation result:", stats);
 
+    console.log("🔍🔍🔍 [Usage Stats] Starting countDocuments...");
     const allTimeTotal = await Link.countDocuments({
       userId: mongoose.Types.ObjectId(userId),
     });
-    console.log("[Usage Stats] All time total:", allTimeTotal);
+    console.log("🔍🔍🔍 [Usage Stats] All time total:", allTimeTotal);
 
-    res.status(200).json({
+    const response = {
       monthlyTotal: stats[0]?.monthlyTotal || 0,
       allTimeTotal: allTimeTotal,
-    });
+    };
+
+    console.log("🔍🔍🔍 [Usage Stats] Sending response:", response);
+    console.log("🔍🔍🔍 [Usage Stats] Response status: 200");
+    res.status(200).json(response);
+    console.log("🔍🔍🔍 [Usage Stats] Response sent successfully");
   } catch (error) {
-    console.error("[Usage Stats Error]", error);
-    console.error("Error stack:", error.stack);
+    console.error("🔍🔍🔍 [Usage Stats Error]", error);
+    console.error("🔍🔍🔍 Error stack:", error.stack);
+    console.error("🔍🔍🔍 Error message:", error.message);
+    console.error("🔍🔍🔍 Error name:", error.name);
     res.status(500).json({
       error: "Failed to fetch stats",
       details: error.message,
@@ -236,12 +251,32 @@ const getUsageStats = asyncHandler(async (req, res) => {
 
 // Get single link
 const getSingleLink = async (req, res) => {
+  console.log("🔍🔍🔍 GET SINGLE LINK FUNCTION START");
+  console.log("🔍🔍🔍 req.params:", req.params);
+  console.log("🔍🔍🔍 req.user._id:", req.user._id);
+
   try {
     const { id } = req.params;
+    console.log("🔍🔍🔍 Link ID from params:", id);
+    console.log("🔍🔍🔍 User ID:", req.user._id);
+
+    console.log("🔍🔍🔍 Searching for link with criteria:", {
+      _id: id,
+      userId: req.user._id,
+    });
     const link = await Link.findOne({ _id: id, userId: req.user._id });
-    if (!link) return res.status(404).json({ error: "Link not found" });
+    console.log("🔍🔍🔍 Link found:", link ? "YES" : "NO");
+
+    if (!link) {
+      console.log("🔍🔍🔍 Link not found, returning 404");
+      return res.status(404).json({ error: "Link not found" });
+    }
+
+    console.log("🔍🔍🔍 Link found, sending response");
     res.json({ link });
   } catch (error) {
+    console.error("🔍🔍🔍 Error in getSingleLink:", error);
+    console.error("🔍🔍🔍 Error stack:", error.stack);
     res.status(500).json({ error: "Something went wrong" });
   }
 };

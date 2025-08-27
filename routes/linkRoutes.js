@@ -15,8 +15,23 @@ const router = express.Router();
 
 router.delete("/links/:id", authMiddleware, deleteLink);
 router.post("/links/track/:id", trackLinkView);
-router.get("/links/usage-stats", authMiddleware, getUsageStats);
-router.get("/links/:id", authMiddleware, getSingleLink);
+router.get("/links/usage-stats", authMiddleware, (req, res, next) => {
+  console.log("🔍🔍🔍 USAGE STATS ROUTE HIT");
+  console.log("🔍🔍🔍 Request URL:", req.originalUrl);
+  console.log("🔍🔍🔍 Request method:", req.method);
+  console.log("🔍🔍🔍 User ID:", req.user._id);
+  console.log("🔍🔍🔍 Calling getUsageStats function");
+  getUsageStats(req, res, next);
+});
+router.get("/links/:id", authMiddleware, (req, res, next) => {
+  console.log("🔍🔍🔍 SINGLE LINK ROUTE HIT");
+  console.log("🔍🔍🔍 Request URL:", req.originalUrl);
+  console.log("🔍🔍🔍 Request method:", req.method);
+  console.log("🔍🔍🔍 Link ID:", req.params.id);
+  console.log("🔍🔍🔍 User ID:", req.user._id);
+  console.log("🔍🔍🔍 Calling getSingleLink function");
+  getSingleLink(req, res, next);
+});
 router.post(
   "/links",
   authMiddleware,

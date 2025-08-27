@@ -82,11 +82,26 @@ app.get("/", (req, res) => {
   res.send("LinkBolt Server is up and running 🚀");
 });
 
+// Add request logging middleware
+app.use((req, res, next) => {
+  console.log("🔍🔍🔍 APP: Incoming request");
+  console.log("🔍🔍🔍 APP: Method:", req.method);
+  console.log("🔍🔍🔍 APP: URL:", req.originalUrl);
+  console.log("🔍🔍🔍 APP: Headers:", req.headers);
+  next();
+});
+
+console.log("🔍🔍🔍 APP: Mounting routes...");
 app.use("/api/v1/public/links", publicLinkRouter);
+console.log("🔍🔍🔍 APP: Mounted /api/v1/public/links");
 app.use("/api/v1", authRouter);
+console.log("🔍🔍🔍 APP: Mounted /api/v1 (auth)");
 app.use("/api/v1", googleAuthRouter);
+console.log("🔍🔍🔍 APP: Mounted /api/v1 (google auth)");
 app.use("/api/v1", authMiddleware, linkRouter);
+console.log("🔍🔍🔍 APP: Mounted /api/v1 (links)");
 app.use("/api/v1/paddle", paddleRouter);
+console.log("🔍🔍🔍 APP: Mounted /api/v1/paddle");
 
 // ========== Error Middleware ==========
 app.use(notFoundMiddleware);
