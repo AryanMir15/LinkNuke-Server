@@ -122,35 +122,24 @@ const login = async (req, res) => {
         .json({ error: "Please provide valid credentials" });
     }
 
-    console.log("🔍🔍🔍 LOGIN: About to call req.login with user:", {
+    console.log("🔍🔍🔍 LOGIN: Creating JWT token for user:", {
       id: user._id,
       email: user.email,
     });
 
-    req.login(user, (err) => {
-      if (err) {
-        console.error("🔍🔍🔍 LOGIN: Login session error:", err);
-        return res.status(500).json({ error: "Session initialization failed" });
-      }
+    // Create JWT token
+    const token = user.createJWT();
 
-      console.log("🔍🔍🔍 LOGIN: req.login successful");
-      console.log("🔍🔍🔍 LOGIN: req.session after login:", req.session);
-      console.log(
-        "🔍🔍🔍 LOGIN: req.user after login:",
-        req.user ? { id: req.user._id, email: req.user.email } : "NO USER"
-      );
+    console.log("🔍🔍🔍 LOGIN: JWT token created successfully");
 
-      req.session.save(() => {
-        console.log("🔍🔍🔍 LOGIN: Session saved successfully");
-        console.log("🔍🔍🔍 LOGIN: Final session state:", req.session);
-        res.status(200).json({
-          user: {
-            firstName: user.firstName,
-            lastName: user.lastName,
-            email: user.email,
-          },
-        });
-      });
+    res.status(200).json({
+      success: true,
+      token,
+      user: {
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+      },
     });
   } catch (error) {
     console.error("Login error:", error);

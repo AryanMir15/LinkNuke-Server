@@ -1,37 +1,54 @@
-const { UnauthenticatedError } = require("../errors");
+const jwt = require("jsonwebtoken");
+const User = require("../models/User");
 
-const authMiddleware = (req, res, next) => {
-  console.log("🔍🔍🔍 AUTH MIDDLEWARE START");
+const authMiddleware = async (req, res, next) => {
+  console.log("🔍🔍🔍 JWT AUTH MIDDLEWARE START");
   console.log("🔍🔍🔍 Request URL:", req.originalUrl);
   console.log("🔍🔍🔍 Request method:", req.method);
-  console.log("🔍🔍🔍 isAuthenticated():", req.isAuthenticated());
-  console.log(
-    "🔍🔍🔍 req.user:",
-    req.user ? { id: req.user._id, email: req.user.email } : "NO USER"
-  );
-  console.log(
-    "🔍🔍🔍 req.session:",
-    req.session ? { id: req.session.id, user: req.session.user } : "NO SESSION"
-  );
 
-  if (!req.isAuthenticated()) {
-    console.log("🔍🔍🔍 AUTH FAILED - User not authenticated");
-    console.log("🔍🔍🔍 Returning 401 JSON response");
-    return res.status(401).json({ error: "Authentication required" });
+  try {
+    // Get token from Authorization header
+    const authHeader = req.headers.authorization;
+    console.log("🔍🔍🔍 Authorization header:", authHeader);
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      console.log("🔍🔍🔍 AUTH FAILED - No Bearer token found");
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const token = authHeader.substring(7); // Remove "Bearer " prefix
+    console.log("🔍🔍🔍 Extracted token:", token ? "TOKEN_EXISTS" : "NO_TOKEN");
+
+    // Verify JWT token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log("🔍🔍🔍 JWT decoded:", { userId: decoded.userId });
+
+    // Find user by ID
+    const user = await User.findById(decoded.userId);
+    if (!user) {
+      console.log("🔍🔍🔍 AUTH FAILED - User not found");
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    console.log("🔍🔍🔍 User found:", {
+      id: user._id,
+      email: user.email,
+      isVerified: user.isVerified,
+    });
+
+    if (!user.isVerified) {
+      console.log("🔍🔍🔍 AUTH FAILED - User not verified");
+      return res.status(403).json({ error: "Email verification required" });
+    }
+
+    // Attach user to request
+    req.user = user;
+    console.log("🔍🔍🔍 JWT AUTH SUCCESS - User authenticated and verified");
+    next();
+  } catch (error) {
+    console.error("🔍🔍🔍 JWT AUTH ERROR:", error.message);
+    return res.status(401).json({ error: "Invalid token" });
   }
-
-  console.log("🔍🔍🔍 User authenticated, checking verification");
-  console.log("🔍🔍🔍 req.user.isVerified:", req.user.isVerified);
-
-  if (!req.user.isVerified) {
-    console.log("🔍🔍🔍 VERIFICATION FAILED - User not verified");
-    console.log("🔍🔍🔍 Returning 403 JSON response");
-    return res.status(403).json({ error: "Email verification required" });
-  }
-
-  console.log("🔍🔍🔍 AUTH SUCCESS - User authenticated and verified");
-  console.log("🔍🔍🔍 Calling next()");
-  next();
 };
 
 module.exports = authMiddleware;
