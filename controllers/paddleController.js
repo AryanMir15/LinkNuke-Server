@@ -134,21 +134,8 @@ const createCheckoutSession = async (req, res) => {
 
     console.log("User found:", user.email);
 
-    // Use hosted checkout approach
-    console.log("Creating hosted checkout URL...");
-
-    // Build the hosted checkout URL with parameters
-    const isSandbox = process.env.PADDLE_ENV === "sandbox";
-    const baseUrl = isSandbox
-      ? "https://sandbox-pay.paddle.io/hsc_01k2hs7cq223hqjfjb1e37pm1b_zv8rjbpb4zteq84hdrf0v0k0g3wgfxt6"
-      : "https://checkout.paddle.com/hsc_01k2hs7cq223hqjfjb1e37pm1b_zv8rjbpb4zteq84hdrf0v0k0g3wgfxt6";
-
-    const hostedCheckoutUrl = new URL(baseUrl);
-
-    // Add the specific price_id for the selected plan
-    hostedCheckoutUrl.searchParams.set("price_id", product.priceId);
-    hostedCheckoutUrl.searchParams.set("quantity", "1");
-    hostedCheckoutUrl.searchParams.set("customer_email", user.email);
+    // Use Paddle API checkout (supports passthrough data)
+    console.log("🔍 CHECKOUT: Creating API checkout session...");
 
     // Add custom data to track which plan was selected
     const passthroughData = {
@@ -158,45 +145,31 @@ const createCheckoutSession = async (req, res) => {
     };
 
     console.log("🔍 CHECKOUT: Passthrough data:", passthroughData);
-    hostedCheckoutUrl.searchParams.set(
-      "passthrough",
-      JSON.stringify(passthroughData)
-    );
 
-    // Set redirect URLs
-    hostedCheckoutUrl.searchParams.set(
-      "success_url",
-      `${process.env.CLIENT_URL}/dashboard?payment=success`
-    );
-    hostedCheckoutUrl.searchParams.set(
-      "cancel_url",
-      `${process.env.CLIENT_URL}/pricing?payment=cancelled`
-    );
+    // Create checkout session using Paddle API
+    const checkoutSession = await paddle.checkouts.create({
+      items: [
+        {
+          priceId: product.priceId,
+          quantity: 1,
+        },
+      ],
+      customerEmail: user.email,
+      customData: passthroughData, // This will be passed through to webhooks
+      successUrl: `${process.env.CLIENT_URL}/dashboard?payment=success`,
+      cancelUrl: `${process.env.CLIENT_URL}/pricing?payment=cancelled`,
+    });
 
-    // Optional: Add these for better UX
-    hostedCheckoutUrl.searchParams.set("disable_quantity", "true");
-    hostedCheckoutUrl.searchParams.set("disable_coupon", "true");
-
-    console.log(
-      "🔍 CHECKOUT: Hosted checkout URL created:",
-      hostedCheckoutUrl.toString()
-    );
-    console.log(
-      "🔍 CHECKOUT: URL search params:",
-      hostedCheckoutUrl.searchParams.toString()
-    );
-    console.log("🔍 CHECKOUT: Selected plan:", product.name);
-    console.log("🔍 CHECKOUT: Price ID:", product.priceId);
-    console.log(
-      "🔍 CHECKOUT: Environment:",
-      isSandbox ? "sandbox" : "production"
-    );
-    console.log("🔍 CHECKOUT: Base URL:", baseUrl);
+    console.log("🔍 CHECKOUT: API checkout session created:", {
+      id: checkoutSession.id,
+      url: checkoutSession.url,
+      customData: checkoutSession.customData,
+    });
 
     const response = {
-      checkoutUrl: hostedCheckoutUrl.toString(),
-      transactionId: null,
-      originalCheckoutUrl: hostedCheckoutUrl.toString(),
+      checkoutUrl: checkoutSession.url,
+      transactionId: checkoutSession.id,
+      originalCheckoutUrl: checkoutSession.url,
     };
 
     console.log("🔍 CHECKOUT: Sending response:", response);
@@ -260,6 +233,7 @@ const handleWebhook = async (req, res) => {
       passthrough: event.data.passthrough
         ? JSON.parse(event.data.passthrough)
         : null,
+      customData: event.data.customData || null,
     });
 
     // Log full event data for debugging
@@ -275,6 +249,7 @@ const handleWebhook = async (req, res) => {
       passthrough: event?.data?.passthrough
         ? JSON.parse(event.data.passthrough)
         : null,
+      customData: event?.data?.customData || null,
       receivedAt: new Date().toISOString(),
     });
 
@@ -335,19 +310,25 @@ const handleTransactionCompleted = async (data) => {
     console.log("🔍 TRANSACTION: Processing transaction:", data.id);
     console.log("🔍 TRANSACTION: Full data:", JSON.stringify(data, null, 2));
 
+    // Try to get user data from customData first, then passthrough
+    const customData = data.customData || {};
     const passthrough = data.passthrough ? JSON.parse(data.passthrough) : {};
-    const userId = passthrough.userId;
-    const productType = passthrough.productType;
+    const userData = customData.userId ? customData : passthrough;
+
+    const userId = userData.userId;
+    const productType = userData.productType;
     const customerId = data.customer_id;
 
+    console.log("🔍 TRANSACTION: Custom data:", customData);
     console.log("🔍 TRANSACTION: Passthrough data:", passthrough);
+    console.log("🔍 TRANSACTION: Using user data:", userData);
     console.log("🔍 TRANSACTION: User ID:", userId);
     console.log("🔍 TRANSACTION: Product Type:", productType);
     console.log("🔍 TRANSACTION: Customer ID:", customerId);
 
     if (!userId) {
       console.error(
-        "🔍 TRANSACTION: No userId in transaction passthrough data"
+        "🔍 TRANSACTION: No userId in transaction customData or passthrough data"
       );
       return;
     }
