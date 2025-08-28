@@ -103,7 +103,13 @@ const createCheckoutSession = async (req, res) => {
     }
 
     const product = PRODUCTS[productType];
-    console.log("Product config:", product);
+    console.log("🔍 CHECKOUT: Product config:", product);
+    console.log("🔍 CHECKOUT: Product priceId:", product.priceId);
+    console.log("🔍 CHECKOUT: Environment variables:", {
+      PADDLE_STARTER_PRICE_ID: process.env.PADDLE_STARTER_PRICE_ID,
+      PADDLE_PRO_PRICE_ID: process.env.PADDLE_PRO_PRICE_ID,
+      PADDLE_LIFETIME_PRICE_ID: process.env.PADDLE_LIFETIME_PRICE_ID,
+    });
 
     // Check if product has a valid priceId
     if (!product.priceId) {
@@ -145,13 +151,16 @@ const createCheckoutSession = async (req, res) => {
     hostedCheckoutUrl.searchParams.set("customer_email", user.email);
 
     // Add custom data to track which plan was selected
+    const passthroughData = {
+      userId: user._id.toString(),
+      productType: productType,
+      planName: product.name,
+    };
+
+    console.log("🔍 CHECKOUT: Passthrough data:", passthroughData);
     hostedCheckoutUrl.searchParams.set(
       "passthrough",
-      JSON.stringify({
-        userId: user._id.toString(),
-        productType: productType,
-        planName: product.name,
-      })
+      JSON.stringify(passthroughData)
     );
 
     // Set redirect URLs
@@ -168,9 +177,21 @@ const createCheckoutSession = async (req, res) => {
     hostedCheckoutUrl.searchParams.set("disable_quantity", "true");
     hostedCheckoutUrl.searchParams.set("disable_coupon", "true");
 
-    console.log("Hosted checkout URL created:", hostedCheckoutUrl.toString());
-    console.log("Selected plan:", product.name);
-    console.log("Price ID:", product.priceId);
+    console.log(
+      "🔍 CHECKOUT: Hosted checkout URL created:",
+      hostedCheckoutUrl.toString()
+    );
+    console.log(
+      "🔍 CHECKOUT: URL search params:",
+      hostedCheckoutUrl.searchParams.toString()
+    );
+    console.log("🔍 CHECKOUT: Selected plan:", product.name);
+    console.log("🔍 CHECKOUT: Price ID:", product.priceId);
+    console.log(
+      "🔍 CHECKOUT: Environment:",
+      isSandbox ? "sandbox" : "production"
+    );
+    console.log("🔍 CHECKOUT: Base URL:", baseUrl);
 
     const response = {
       checkoutUrl: hostedCheckoutUrl.toString(),
@@ -241,6 +262,12 @@ const handleWebhook = async (req, res) => {
         : null,
     });
 
+    // Log full event data for debugging
+    console.log(
+      "🔍 WEBHOOK: Full event data:",
+      JSON.stringify(event.data, null, 2)
+    );
+
     console.log("Webhook Verification:", {
       eventType: event?.eventType,
       verified: !!event,
@@ -254,6 +281,10 @@ const handleWebhook = async (req, res) => {
     console.log("Webhook received:", event.eventType);
 
     switch (event.eventType) {
+      case "transaction.created":
+        console.log("🔍 WEBHOOK: Transaction created - waiting for completion");
+        break;
+
       case "transaction.completed":
         await handleTransactionCompleted(event.data);
         break;
