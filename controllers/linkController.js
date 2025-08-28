@@ -2,17 +2,8 @@ const crypto = require("crypto");
 const mongoose = require("mongoose");
 const dayjs = require("dayjs");
 const customParseFormat = require("dayjs/plugin/customParseFormat.js");
-const paddle = require("@paddle/paddle-node-sdk");
 
 dayjs.extend(customParseFormat);
-
-// Initialize Paddle SDK
-const isSandbox = process.env.PADDLE_ENV === "sandbox";
-
-const paddleClient = new paddle.Paddle({
-  environment: isSandbox ? "sandbox" : "production",
-  apiKey: process.env.PADDLE_API_KEY,
-});
 
 const Link = require("../models/Link");
 const User = require("../models/User");
@@ -374,28 +365,7 @@ const getLinkByLinkId = async (req, res) => {
   }
 };
 
-const handleWebhook = async (req, res) => {
-  let event;
-  try {
-    event = paddleClient.webhooks.constructEvent(
-      req.body,
-      req.headers["paddle-signature"],
-      process.env.PADDLE_WEBHOOK_SECRET
-    );
-  } catch (err) {
-    console.error("Webhook error:", err);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
-
-  switch (event.type) {
-    case "payment.completed":
-      const payment = event.data;
-      // Handle payment completion logic
-      break;
-  }
-
-  res.json({ received: true });
-};
+// Webhook handler moved to paddleController.js
 
 module.exports = {
   createLink,
@@ -406,6 +376,5 @@ module.exports = {
   deleteLink,
   getLinkByLinkId,
   createCheckoutSession,
-  handleWebhook,
   getUsageStats,
 };

@@ -132,9 +132,12 @@ const createCheckoutSession = async (req, res) => {
     console.log("Creating hosted checkout URL...");
 
     // Build the hosted checkout URL with parameters
-    const hostedCheckoutUrl = new URL(
-      "https://sandbox-pay.paddle.io/hsc_01k2hs7cq223hqjfjb1e37pm1b_zv8rjbpb4zteq84hdrf0v0k0g3wgfxt6"
-    );
+    const isSandbox = process.env.PADDLE_ENV === "sandbox";
+    const baseUrl = isSandbox
+      ? "https://sandbox-pay.paddle.io/hsc_01k2hs7cq223hqjfjb1e37pm1b_zv8rjbpb4zteq84hdrf0v0k0g3wgfxt6"
+      : "https://checkout.paddle.com/hsc_01k2hs7cq223hqjfjb1e37pm1b_zv8rjbpb4zteq84hdrf0v0k0g3wgfxt6";
+
+    const hostedCheckoutUrl = new URL(baseUrl);
 
     // Add the specific price_id for the selected plan
     hostedCheckoutUrl.searchParams.set("price_id", product.priceId);
@@ -169,11 +172,14 @@ const createCheckoutSession = async (req, res) => {
     console.log("Selected plan:", product.name);
     console.log("Price ID:", product.priceId);
 
-    res.json({
+    const response = {
       checkoutUrl: hostedCheckoutUrl.toString(),
       transactionId: null,
       originalCheckoutUrl: hostedCheckoutUrl.toString(),
-    });
+    };
+
+    console.log("🔍 CHECKOUT: Sending response:", response);
+    res.json(response);
   } catch (error) {
     console.error("Checkout creation error:", error);
     console.error("Error stack:", error.stack);
@@ -337,24 +343,44 @@ const handleTransactionCompleted = async (data) => {
       planLimits[productType]
     );
 
-    user.subscription = {
-      status: "active",
-      plan: productType,
-      transactionId: data.id,
-      customerId: customerId,
-      startDate: new Date(data.effective_at),
-      endDate:
-        productType === "lifetime"
-          ? null
-          : new Date(data.billing_period.end_date),
-      usageLimits: planLimits[productType],
-      isTrial: false,
-      trialDays: 0,
-    };
+    // Update subscription with proper error handling
+    try {
+      user.subscription = {
+        status: "active",
+        plan: productType,
+        transactionId: data.id,
+        customerId: customerId,
+        startDate: new Date(data.effective_at || data.created_at || new Date()),
+        endDate:
+          productType === "lifetime"
+            ? null
+            : new Date(
+                data.billing_period?.end_date ||
+                  data.next_billed_at ||
+                  new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+              ),
+        usageLimits: planLimits[productType],
+        isTrial: false,
+        trialDays: 0,
+      };
 
-    // Initialize usage counters
-    user.usage.linksCreated = 0;
-    user.usage.storageUsed = 0;
+      // Initialize usage counters if they don't exist
+      if (!user.usage) {
+        user.usage = {
+          linksCreated: 0,
+          storageUsed: 0,
+        };
+      } else {
+        user.usage.linksCreated = user.usage.linksCreated || 0;
+        user.usage.storageUsed = user.usage.storageUsed || 0;
+      }
+    } catch (updateError) {
+      console.error(
+        "🔍 TRANSACTION: Error updating user subscription:",
+        updateError
+      );
+      throw updateError;
+    }
 
     console.log("🔍 TRANSACTION: Updating user subscription:", {
       plan: productType,
