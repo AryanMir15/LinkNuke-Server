@@ -191,13 +191,21 @@ const createCheckoutSession = async (req, res) => {
 // Handle webhooks
 const handleWebhook = async (req, res) => {
   try {
+    console.log("🔍 WEBHOOK: Starting webhook processing");
+
     if (!paddle) {
       console.error("Paddle client not initialized for webhook");
       return res.status(503).json({ error: "Payment service unavailable" });
     }
 
     const signature = req.headers["paddle-signature"];
+    console.log(
+      "🔍 WEBHOOK: Signature header:",
+      signature ? "PRESENT" : "MISSING"
+    );
+
     if (!signature) {
+      console.error("🔍 WEBHOOK: Missing signature header");
       return res.status(400).json({ error: "Missing signature" });
     }
 
@@ -205,6 +213,12 @@ const handleWebhook = async (req, res) => {
     const rawBody = Buffer.isBuffer(req.body)
       ? req.body.toString("utf8")
       : JSON.stringify(req.body);
+
+    console.log("🔍 WEBHOOK: Raw body length:", rawBody.length);
+    console.log(
+      "🔍 WEBHOOK: Webhook secret available:",
+      !!process.env.PADDLE_WEBHOOK_SECRET
+    );
 
     // Verify webhook signature
     const event = await paddle.webhooks.unmarshal(
@@ -260,31 +274,54 @@ const handleWebhook = async (req, res) => {
 
     res.json({ received: true });
   } catch (error) {
-    console.error("Webhook error:", error);
-    res.status(400).json({ error: "Webhook verification failed" });
+    console.error("🔍 WEBHOOK ERROR:", error.message);
+    console.error("🔍 WEBHOOK ERROR STACK:", error.stack);
+
+    if (
+      error.message.includes("signature") ||
+      error.message.includes("verification")
+    ) {
+      console.error("🔍 WEBHOOK: Signature verification failed");
+      return res
+        .status(400)
+        .json({ error: "Webhook signature verification failed" });
+    }
+
+    console.error("🔍 WEBHOOK: General webhook processing error");
+    res.status(400).json({ error: "Webhook processing failed" });
   }
 };
 
 // Webhook handlers
 const handleTransactionCompleted = async (data) => {
   try {
-    console.log("Processing transaction:", data.id);
+    console.log("🔍 TRANSACTION: Processing transaction:", data.id);
+    console.log("🔍 TRANSACTION: Full data:", JSON.stringify(data, null, 2));
 
     const passthrough = data.passthrough ? JSON.parse(data.passthrough) : {};
     const userId = passthrough.userId;
     const productType = passthrough.productType;
     const customerId = data.customer_id;
 
+    console.log("🔍 TRANSACTION: Passthrough data:", passthrough);
+    console.log("🔍 TRANSACTION: User ID:", userId);
+    console.log("🔍 TRANSACTION: Product Type:", productType);
+    console.log("🔍 TRANSACTION: Customer ID:", customerId);
+
     if (!userId) {
-      console.error("No userId in transaction passthrough data");
+      console.error(
+        "🔍 TRANSACTION: No userId in transaction passthrough data"
+      );
       return;
     }
 
     const user = await User.findById(userId);
     if (!user) {
-      console.error("User not found:", userId);
+      console.error("🔍 TRANSACTION: User not found:", userId);
       return;
     }
+
+    console.log("🔍 TRANSACTION: User found:", user.email);
 
     // Update user subscription status with plan limits
     const planLimits = {
@@ -292,6 +329,13 @@ const handleTransactionCompleted = async (data) => {
       pro: { links: 50, customDomains: 3 },
       lifetime: { links: 9999, customDomains: 10 },
     };
+
+    console.log(
+      "🔍 TRANSACTION: Plan limits for",
+      productType,
+      ":",
+      planLimits[productType]
+    );
 
     user.subscription = {
       status: "active",
@@ -312,8 +356,18 @@ const handleTransactionCompleted = async (data) => {
     user.usage.linksCreated = 0;
     user.usage.storageUsed = 0;
 
+    console.log("🔍 TRANSACTION: Updating user subscription:", {
+      plan: productType,
+      status: "active",
+      transactionId: data.id,
+      customerId: customerId,
+      usageLimits: planLimits[productType],
+    });
+
     await user.save();
-    console.log(`User ${userId} subscription activated`);
+    console.log(
+      `🔍 TRANSACTION: User ${userId} subscription activated successfully`
+    );
   } catch (error) {
     console.error("Error handling transaction completed:", error);
   }

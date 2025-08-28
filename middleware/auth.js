@@ -6,6 +6,12 @@ const authMiddleware = async (req, res, next) => {
   console.log("🔍🔍🔍 Request URL:", req.originalUrl);
   console.log("🔍🔍🔍 Request method:", req.method);
 
+  // Skip authentication for Paddle webhook routes
+  if (req.originalUrl.includes("/paddle/webhook")) {
+    console.log("🔍🔍🔍 SKIPPING AUTH - Paddle webhook route");
+    return next();
+  }
+
   try {
     // Get token from Authorization header
     const authHeader = req.headers.authorization;
