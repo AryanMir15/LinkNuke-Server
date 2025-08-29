@@ -218,6 +218,24 @@ const handleWebhook = async (req, res) => {
           console.log("✅ Transaction completed successfully");
           break;
 
+        case "transaction.paid":
+          console.log("✅ Processing transaction.paid...");
+          await handleTransactionPaid(event.data);
+          console.log("✅ Transaction paid successfully");
+          break;
+
+        case "transaction.payment_failed":
+          console.log("❌ Processing transaction.payment_failed...");
+          await handleTransactionPaymentFailed(event.data);
+          console.log("✅ Transaction payment failed handled");
+          break;
+
+        case "transaction.refunded":
+          console.log("🔄 Processing transaction.refunded...");
+          await handleTransactionRefunded(event.data);
+          console.log("✅ Transaction refunded handled");
+          break;
+
         case "subscription.created":
           console.log("✅ Processing subscription.created...");
           await handleSubscriptionCreated(event.data);
@@ -231,15 +249,34 @@ const handleWebhook = async (req, res) => {
           break;
 
         case "subscription.updated":
+          console.log("🔄 Processing subscription.updated...");
           await handleSubscriptionUpdated(event.data);
+          console.log("✅ Subscription updated successfully");
           break;
 
         case "subscription.cancelled":
+        case "subscription.canceled":
+          console.log("❌ Processing subscription.cancelled...");
           await handleSubscriptionCancelled(event.data);
+          console.log("✅ Subscription cancelled successfully");
           break;
 
         case "subscription.paused":
+          console.log("⏸️ Processing subscription.paused...");
           await handleSubscriptionPaused(event.data);
+          console.log("✅ Subscription paused successfully");
+          break;
+
+        case "subscription.resumed":
+          console.log("▶️ Processing subscription.resumed...");
+          await handleSubscriptionResumed(event.data);
+          console.log("✅ Subscription resumed successfully");
+          break;
+
+        case "subscription.past_due":
+          console.log("⚠️ Processing subscription.past_due...");
+          await handleSubscriptionPastDue(event.data);
+          console.log("✅ Subscription past due handled");
           break;
 
         default:
@@ -276,121 +313,45 @@ const handleTransactionCompleted = async (data) => {
     console.log(`💰 Processing transaction: ${data.id}`);
     console.log(`📊 Transaction data:`, JSON.stringify(data, null, 2));
 
-    // Try to get user data from customData first, then passthrough, then by email
-    const customData = data.customData || {};
-    const passthrough = data.passthrough ? JSON.parse(data.passthrough) : {};
-    const userData = customData.userId ? customData : passthrough;
+    // For transaction.completed, we only need to log the transaction completion
+    // The actual subscription activation is handled by subscription.activated webhook
+    // This prevents double processing and conflicts
 
-    console.log(`🔍 Custom data:`, customData);
-    console.log(`🔍 Passthrough data:`, passthrough);
-    console.log(`📧 Customer email:`, data.customer?.email);
+    const customerId = data.customerId;
+    const transactionId = data.id;
+    const status = data.status;
 
-    let userId = userData.userId;
-    let productType = userData.productType;
-    const customerId = data.customer_id;
-    const customerEmail = data.customer?.email;
+    console.log(
+      `✅ Transaction ${transactionId} completed with status: ${status}`
+    );
+    console.log(`🆔 Customer ID: ${customerId}`);
 
-    // If no userId from passthrough, try to get customer email from Paddle API
-    if (!userId && customerId) {
+    // Only update transaction ID if we can find the user, but don't activate subscription
+    if (customerId) {
       try {
-        console.log(
-          `🔍 Fetching customer details from Paddle API: ${customerId}`
-        );
-        const customer = await paddle.customers.get(customerId);
-        const customerEmail = customer.email;
+        // Try to find user by customer ID
+        const user = await User.findOne({
+          "subscription.customerId": customerId,
+        });
 
-        if (customerEmail) {
-          console.log(`📧 Found customer email: ${customerEmail}`);
-          const userByEmail = await User.findOne({ email: customerEmail });
-          if (userByEmail) {
-            userId = userByEmail._id.toString();
-            // Determine product type from price ID
-            const priceId = data.lineItems?.[0]?.priceId;
-            if (priceId === process.env.PADDLE_STARTER_PRICE_ID) {
-              productType = "starter";
-            } else if (priceId === process.env.PADDLE_PRO_PRICE_ID) {
-              productType = "pro";
-            } else if (priceId === process.env.PADDLE_LIFETIME_PRICE_ID) {
-              productType = "lifetime";
-            }
-            console.log(`✅ Found user: ${userId}, plan: ${productType}`);
+        if (user) {
+          // Update transaction ID in subscription if it exists
+          if (user.subscription) {
+            user.subscription.transactionId = transactionId;
+            await user.save();
+            console.log(`📝 Updated transaction ID for user: ${user.email}`);
           }
+        } else {
+          console.log(
+            `ℹ️ No user found for customer ID: ${customerId} - subscription activation will be handled by subscription.activated webhook`
+          );
         }
       } catch (error) {
-        console.error(`❌ Error fetching customer from Paddle:`, error.message);
+        console.error(`❌ Error updating transaction ID:`, error.message);
       }
     }
 
-    // If still no userId, try to find user by customer ID (fallback)
-    if (!userId && customerId) {
-      console.log(`🔍 Looking up user by customer ID: ${customerId}`);
-      const userByCustomerId = await User.findOne({
-        "subscription.customerId": customerId,
-      });
-      if (userByCustomerId) {
-        userId = userByCustomerId._id.toString();
-        console.log(`✅ Found user by customer ID: ${userId}`);
-      }
-    }
-
-    if (!userId) {
-      console.error("❌ No userId found in transaction data");
-      return;
-    }
-
-    const user = await User.findById(userId);
-    if (!user) {
-      console.error(`❌ User not found: ${userId}`);
-      return;
-    }
-
-    console.log(`👤 Updating user: ${user.email}`);
-
-    // Update user subscription status with plan limits
-    const planLimits = {
-      starter: { links: 10, customDomains: 1 },
-      pro: { links: 50, customDomains: 3 },
-      lifetime: { links: 9999, customDomains: 10 },
-    };
-
-    // Update subscription with proper error handling
-    try {
-      user.subscription = {
-        status: "active",
-        plan: productType,
-        transactionId: data.id,
-        customerId: customerId,
-        startDate: new Date(data.effective_at || data.created_at || new Date()),
-        endDate:
-          productType === "lifetime"
-            ? null
-            : new Date(
-                data.billing_period?.end_date ||
-                  data.next_billed_at ||
-                  new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-              ),
-        usageLimits: planLimits[productType],
-        isTrial: false,
-        trialDays: 0,
-      };
-
-      // Initialize usage counters if they don't exist
-      if (!user.usage) {
-        user.usage = {
-          linksCreated: 0,
-          storageUsed: 0,
-        };
-      } else {
-        user.usage.linksCreated = user.usage.linksCreated || 0;
-        user.usage.storageUsed = user.usage.storageUsed || 0;
-      }
-    } catch (updateError) {
-      console.error("❌ Error updating user subscription:", updateError);
-      throw updateError;
-    }
-
-    await user.save();
-    console.log(`🎉 User ${user.email} upgraded to ${productType} plan!`);
+    console.log(`✅ Transaction completed processing finished`);
   } catch (error) {
     console.error("Error handling transaction completed:", error);
   }
@@ -480,7 +441,7 @@ const handleSubscriptionActivated = async (data) => {
 
     console.log(`👤 Activating subscription for: ${user.email}`);
 
-    // Determine plan type from subscription data
+    // Determine plan type from subscription data - fix data structure access
     let productType = "pro"; // Default to pro for now
     const priceId = data.items?.[0]?.price?.id;
     if (priceId === process.env.PADDLE_STARTER_PRICE_ID) {
@@ -502,13 +463,13 @@ const handleSubscriptionActivated = async (data) => {
       status: "active",
       plan: productType,
       subscriptionId: data.id,
-      customerId: data.customer_id,
-      startDate: new Date(data.started_at || new Date()),
+      customerId: data.customerId, // Fix: use customerId not customer_id
+      startDate: new Date(data.startedAt || new Date()), // Fix: use startedAt not started_at
       endDate:
         productType === "lifetime"
           ? null
           : new Date(
-              data.next_billed_at ||
+              data.nextBilledAt || // Fix: use nextBilledAt not next_billed_at
                 new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
             ),
       usageLimits: planLimits[productType],
@@ -572,9 +533,95 @@ const handleSubscriptionPaused = async (data) => {
     if (user) {
       user.subscription.status = "paused";
       await user.save();
+      console.log(`⏸️ Subscription paused for user: ${user.email}`);
     }
   } catch (error) {
     console.error("Error handling subscription paused:", error);
+  }
+};
+
+// New webhook handlers for missing events
+const handleTransactionPaid = async (data) => {
+  try {
+    console.log(`💰 Transaction paid: ${data.id}`);
+    const customerId = data.customerId;
+
+    if (customerId) {
+      const user = await User.findOne({
+        "subscription.customerId": customerId,
+      });
+      if (user) {
+        console.log(`✅ Payment confirmed for user: ${user.email}`);
+        // Could add payment confirmation logic here if needed
+      }
+    }
+  } catch (error) {
+    console.error("Error handling transaction paid:", error);
+  }
+};
+
+const handleTransactionPaymentFailed = async (data) => {
+  try {
+    console.log(`❌ Payment failed for transaction: ${data.id}`);
+    const customerId = data.customerId;
+
+    if (customerId) {
+      const user = await User.findOne({
+        "subscription.customerId": customerId,
+      });
+      if (user) {
+        console.log(`⚠️ Payment failed for user: ${user.email}`);
+        // Could add payment failure notification logic here
+      }
+    }
+  } catch (error) {
+    console.error("Error handling transaction payment failed:", error);
+  }
+};
+
+const handleTransactionRefunded = async (data) => {
+  try {
+    console.log(`🔄 Transaction refunded: ${data.id}`);
+    const customerId = data.customerId;
+
+    if (customerId) {
+      const user = await User.findOne({
+        "subscription.customerId": customerId,
+      });
+      if (user) {
+        console.log(`🔄 Refund processed for user: ${user.email}`);
+        // Could add refund processing logic here if needed
+      }
+    }
+  } catch (error) {
+    console.error("Error handling transaction refunded:", error);
+  }
+};
+
+const handleSubscriptionResumed = async (data) => {
+  try {
+    const user = await User.findOne({ "subscription.subscriptionId": data.id });
+    if (user) {
+      user.subscription.status = "active";
+      await user.save();
+      console.log(`▶️ Subscription resumed for user: ${user.email}`);
+    }
+  } catch (error) {
+    console.error("Error handling subscription resumed:", error);
+  }
+};
+
+const handleSubscriptionPastDue = async (data) => {
+  try {
+    const user = await User.findOne({ "subscription.subscriptionId": data.id });
+    if (user) {
+      user.subscription.status = "past_due";
+      await user.save();
+      console.log(`⚠️ Subscription past due for user: ${user.email}`);
+      // Could add past due notification logic here
+    }
+  } catch (error) {
+    console.error("Error handling subscription past due:", error);
   }
 };
 
