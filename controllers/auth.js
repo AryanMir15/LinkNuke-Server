@@ -43,7 +43,7 @@ const register = async (req, res) => {
   try {
     const { firstName, lastName, email, password, confirmPassword } = req.body;
 
-    if (!firstName || !lastName || !email || !password || !confirmPassword) {
+    if (!firstName || !email || !password || !confirmPassword) {
       return res
         .status(400)
         .json({ error: "Please provide all required fields" });
@@ -67,7 +67,7 @@ const register = async (req, res) => {
 
     const user = await User.create({
       firstName,
-      lastName,
+      lastName: lastName || "User",
       email,
       password,
       verificationPin,
