@@ -136,16 +136,9 @@ const createCheckoutSession = async (req, res) => {
     hostedCheckoutUrl.searchParams.set("quantity", "1");
     hostedCheckoutUrl.searchParams.set("customer_email", user.email);
 
-    // Add custom data as passthrough for webhook identification
-    const customData = {
-      userId: user._id.toString(),
-      productType: productType,
-      userEmail: user.email,
-    };
-    hostedCheckoutUrl.searchParams.set(
-      "passthrough",
-      JSON.stringify(customData)
-    );
+    // Store user mapping for webhook identification
+    // Since passthrough doesn't work with hosted checkout, we'll use customer email lookup
+    // The customer email will be set in the checkout URL and we can look it up in webhooks
 
     // Set redirect URLs
     hostedCheckoutUrl.searchParams.set(
@@ -297,22 +290,34 @@ const handleTransactionCompleted = async (data) => {
     const customerId = data.customer_id;
     const customerEmail = data.customer?.email;
 
-    // If no userId from passthrough, try to find user by email
-    if (!userId && customerEmail) {
-      console.log(`🔍 Looking up user by email: ${customerEmail}`);
-      const userByEmail = await User.findOne({ email: customerEmail });
-      if (userByEmail) {
-        userId = userByEmail._id.toString();
-        // Determine product type from price ID
-        const priceId = data.lineItems?.[0]?.priceId;
-        if (priceId === process.env.PADDLE_STARTER_PRICE_ID) {
-          productType = "starter";
-        } else if (priceId === process.env.PADDLE_PRO_PRICE_ID) {
-          productType = "pro";
-        } else if (priceId === process.env.PADDLE_LIFETIME_PRICE_ID) {
-          productType = "lifetime";
+    // If no userId from passthrough, try to get customer email from Paddle API
+    if (!userId && customerId) {
+      try {
+        console.log(
+          `🔍 Fetching customer details from Paddle API: ${customerId}`
+        );
+        const customer = await paddle.customers.get(customerId);
+        const customerEmail = customer.email;
+
+        if (customerEmail) {
+          console.log(`📧 Found customer email: ${customerEmail}`);
+          const userByEmail = await User.findOne({ email: customerEmail });
+          if (userByEmail) {
+            userId = userByEmail._id.toString();
+            // Determine product type from price ID
+            const priceId = data.lineItems?.[0]?.priceId;
+            if (priceId === process.env.PADDLE_STARTER_PRICE_ID) {
+              productType = "starter";
+            } else if (priceId === process.env.PADDLE_PRO_PRICE_ID) {
+              productType = "pro";
+            } else if (priceId === process.env.PADDLE_LIFETIME_PRICE_ID) {
+              productType = "lifetime";
+            }
+            console.log(`✅ Found user: ${userId}, plan: ${productType}`);
+          }
         }
-        console.log(`✅ Found user: ${userId}, plan: ${productType}`);
+      } catch (error) {
+        console.error(`❌ Error fetching customer from Paddle:`, error.message);
       }
     }
 
@@ -419,30 +424,42 @@ const handleSubscriptionActivated = async (data) => {
     console.log(`🎯 Processing subscription activation: ${data.id}`);
     console.log(`📊 Subscription data:`, JSON.stringify(data, null, 2));
 
-    // Try to get user data from customData first, then by email
+    // Try to get user data from customData first, then by customer ID lookup
     const customData = data.customData || {};
-    const customerEmail = data.customer?.email;
+    const customerId = data.customerId;
 
     console.log(`🔍 Custom data:`, customData);
-    console.log(`📧 Customer email:`, customerEmail);
+    console.log(`🆔 Customer ID:`, customerId);
 
     let userId = customData.userId;
 
-    // If no userId from customData, try to find user by email
-    if (!userId && customerEmail) {
-      console.log(`🔍 Looking up user by email: ${customerEmail}`);
-      const userByEmail = await User.findOne({ email: customerEmail });
-      if (userByEmail) {
-        userId = userByEmail._id.toString();
-        console.log(`✅ Found user: ${userId}`);
+    // If no userId from customData, try to get customer email from Paddle API
+    if (!userId && customerId) {
+      try {
+        console.log(
+          `🔍 Fetching customer details from Paddle API: ${customerId}`
+        );
+        const customer = await paddle.customers.get(customerId);
+        const customerEmail = customer.email;
+
+        if (customerEmail) {
+          console.log(`📧 Found customer email: ${customerEmail}`);
+          const userByEmail = await User.findOne({ email: customerEmail });
+          if (userByEmail) {
+            userId = userByEmail._id.toString();
+            console.log(`✅ Found user by email: ${userId}`);
+          }
+        }
+      } catch (error) {
+        console.error(`❌ Error fetching customer from Paddle:`, error.message);
       }
     }
 
     // If still no userId, try to find user by customer ID (fallback)
-    if (!userId && data.customer_id) {
-      console.log(`🔍 Looking up user by customer ID: ${data.customer_id}`);
+    if (!userId && customerId) {
+      console.log(`🔍 Looking up user by customer ID: ${customerId}`);
       const userByCustomerId = await User.findOne({
-        "subscription.customerId": data.customer_id,
+        "subscription.customerId": customerId,
       });
       if (userByCustomerId) {
         userId = userByCustomerId._id.toString();
