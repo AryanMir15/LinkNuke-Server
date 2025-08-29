@@ -455,7 +455,7 @@ const handleSubscriptionActivated = async (data) => {
     // Update user subscription status with plan limits
     const planLimits = {
       starter: { links: 10, customDomains: 1 },
-      pro: { links: 50, customDomains: 3 },
+      pro: { links: 500, customDomains: 3 },
       lifetime: { links: 9999, customDomains: 10 },
     };
 
