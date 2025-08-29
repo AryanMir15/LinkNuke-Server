@@ -108,13 +108,11 @@ app.get("/", (req, res) => {
   res.send("LinkBolt Server is up and running 🚀");
 });
 
-// Add request logging middleware
+// Add request logging middleware (only for non-webhook requests)
 app.use((req, res, next) => {
-  console.log("🔍🔍🔍 APP: Incoming request");
-  console.log("🔍🔍🔍 APP: Method:", req.method);
-  console.log("🔍🔍🔍 APP: URL:", req.originalUrl);
-  console.log("🔍🔍🔍 APP: Cookie header:", req.headers.cookie);
-  console.log("🔍🔍🔍 APP: All headers:", req.headers);
+  if (!req.originalUrl.includes("/paddle/webhook")) {
+    console.log(`📥 ${req.method} ${req.originalUrl}`);
+  }
   next();
 });
 

@@ -81,12 +81,10 @@ console.log("Product configuration loaded:", Object.keys(PRODUCTS));
 // Create checkout session
 const createCheckoutSession = async (req, res) => {
   try {
-    console.log("Creating checkout session with body:", req.body);
     const { productType } = req.body;
     const userId = req.user._id;
 
-    console.log("User ID:", userId);
-    console.log("Product Type:", productType);
+    console.log(`🛒 Creating ${productType} checkout for ${req.user.email}`);
 
     // Check if Paddle is initialized
     if (!paddle) {
@@ -103,13 +101,6 @@ const createCheckoutSession = async (req, res) => {
     }
 
     const product = PRODUCTS[productType];
-    console.log("🔍 CHECKOUT: Product config:", product);
-    console.log("🔍 CHECKOUT: Product priceId:", product.priceId);
-    console.log("🔍 CHECKOUT: Environment variables:", {
-      PADDLE_STARTER_PRICE_ID: process.env.PADDLE_STARTER_PRICE_ID,
-      PADDLE_PRO_PRICE_ID: process.env.PADDLE_PRO_PRICE_ID,
-      PADDLE_LIFETIME_PRICE_ID: process.env.PADDLE_LIFETIME_PRICE_ID,
-    });
 
     // Check if product has a valid priceId
     if (!product.priceId) {
@@ -132,10 +123,7 @@ const createCheckoutSession = async (req, res) => {
       });
     }
 
-    console.log("User found:", user.email);
-
     // Use hosted checkout with customer_email for user identification
-    console.log("🔍 CHECKOUT: Creating hosted checkout...");
 
     // Build the hosted checkout URL with parameters
     const isSandbox = process.env.PADDLE_ENV === "sandbox";
@@ -164,14 +152,7 @@ const createCheckoutSession = async (req, res) => {
     hostedCheckoutUrl.searchParams.set("disable_quantity", "true");
     hostedCheckoutUrl.searchParams.set("disable_coupon", "true");
 
-    console.log(
-      "🔍 CHECKOUT: Hosted checkout URL created:",
-      hostedCheckoutUrl.toString()
-    );
-    console.log("🔍 CHECKOUT: Selected plan:", product.name);
-    console.log("🔍 CHECKOUT: Price ID:", product.priceId);
-    console.log("🔍 CHECKOUT: User email:", user.email);
-    console.log("🔍 CHECKOUT: User ID:", user._id);
+    console.log(`✅ Checkout URL created for ${product.name}`);
 
     const response = {
       checkoutUrl: hostedCheckoutUrl.toString(),
@@ -179,7 +160,6 @@ const createCheckoutSession = async (req, res) => {
       originalCheckoutUrl: hostedCheckoutUrl.toString(),
     };
 
-    console.log("🔍 CHECKOUT: Sending response:", response);
     res.json(response);
   } catch (error) {
     console.error("Checkout creation error:", error);
@@ -198,21 +178,15 @@ const createCheckoutSession = async (req, res) => {
 // Handle webhooks
 const handleWebhook = async (req, res) => {
   try {
-    console.log("🔍 WEBHOOK: Starting webhook processing");
-
     if (!paddle) {
       console.error("Paddle client not initialized for webhook");
       return res.status(503).json({ error: "Payment service unavailable" });
     }
 
     const signature = req.headers["paddle-signature"];
-    console.log(
-      "🔍 WEBHOOK: Signature header:",
-      signature ? "PRESENT" : "MISSING"
-    );
 
     if (!signature) {
-      console.error("🔍 WEBHOOK: Missing signature header");
+      console.error("Missing webhook signature");
       return res.status(400).json({ error: "Missing signature" });
     }
 
@@ -221,12 +195,6 @@ const handleWebhook = async (req, res) => {
       ? req.body.toString("utf8")
       : JSON.stringify(req.body);
 
-    console.log("🔍 WEBHOOK: Raw body length:", rawBody.length);
-    console.log(
-      "🔍 WEBHOOK: Webhook secret available:",
-      !!process.env.PADDLE_WEBHOOK_SECRET
-    );
-
     // Verify webhook signature
     const event = await paddle.webhooks.unmarshal(
       rawBody,
@@ -234,64 +202,45 @@ const handleWebhook = async (req, res) => {
       signature
     );
 
-    console.log("Webhook verified:", {
-      eventType: event.eventType,
-      customerId: event.data.customer_id,
-      passthrough: event.data.passthrough
-        ? JSON.parse(event.data.passthrough)
-        : null,
-      customData: event.data.customData || null,
-    });
+    console.log(`📨 Webhook: ${event.eventType}`);
 
-    // Log full event data for debugging
-    console.log(
-      "🔍 WEBHOOK: Full event data:",
-      JSON.stringify(event.data, null, 2)
-    );
+    try {
+      switch (event.eventType) {
+        case "transaction.created":
+          console.log("⏳ Transaction created - waiting for completion");
+          break;
 
-    console.log("Webhook Verification:", {
-      eventType: event?.eventType,
-      verified: !!event,
-      customerId: event?.data?.customerId,
-      passthrough: event?.data?.passthrough
-        ? JSON.parse(event.data.passthrough)
-        : null,
-      customData: event?.data?.customData || null,
-      receivedAt: new Date().toISOString(),
-    });
+        case "transaction.completed":
+          console.log("✅ Processing transaction.completed...");
+          await handleTransactionCompleted(event.data);
+          console.log("✅ Transaction completed successfully");
+          break;
 
-    console.log("Webhook received:", event.eventType);
+        case "subscription.created":
+          await handleSubscriptionCreated(event.data);
+          break;
 
-    switch (event.eventType) {
-      case "transaction.created":
-        console.log("🔍 WEBHOOK: Transaction created - waiting for completion");
-        break;
+        case "subscription.updated":
+          await handleSubscriptionUpdated(event.data);
+          break;
 
-      case "transaction.completed":
-        await handleTransactionCompleted(event.data);
-        break;
+        case "subscription.cancelled":
+          await handleSubscriptionCancelled(event.data);
+          break;
 
-      case "subscription.created":
-        await handleSubscriptionCreated(event.data);
-        break;
+        case "subscription.paused":
+          await handleSubscriptionPaused(event.data);
+          break;
 
-      case "subscription.updated":
-        await handleSubscriptionUpdated(event.data);
-        break;
+        default:
+          console.log(`⚠️ Unhandled webhook event: ${event.eventType}`);
+      }
 
-      case "subscription.cancelled":
-        await handleSubscriptionCancelled(event.data);
-        break;
-
-      case "subscription.paused":
-        await handleSubscriptionPaused(event.data);
-        break;
-
-      default:
-        console.log(`Unhandled webhook event: ${event.eventType}`);
+      res.json({ received: true });
+    } catch (webhookError) {
+      console.error("❌ Webhook processing error:", webhookError.message);
+      res.status(500).json({ error: "Webhook processing failed" });
     }
-
-    res.json({ received: true });
   } catch (error) {
     console.error("🔍 WEBHOOK ERROR:", error.message);
     console.error("🔍 WEBHOOK ERROR STACK:", error.stack);
@@ -314,8 +263,7 @@ const handleWebhook = async (req, res) => {
 // Webhook handlers
 const handleTransactionCompleted = async (data) => {
   try {
-    console.log("🔍 TRANSACTION: Processing transaction:", data.id);
-    console.log("🔍 TRANSACTION: Full data:", JSON.stringify(data, null, 2));
+    console.log(`💰 Processing transaction: ${data.id}`);
 
     // Try to get user data from customData first, then passthrough, then by email
     const customData = data.customData || {};
@@ -327,17 +275,9 @@ const handleTransactionCompleted = async (data) => {
     const customerId = data.customer_id;
     const customerEmail = data.customer?.email;
 
-    console.log("🔍 TRANSACTION: Custom data:", customData);
-    console.log("🔍 TRANSACTION: Passthrough data:", passthrough);
-    console.log("🔍 TRANSACTION: Customer email:", customerEmail);
-    console.log("🔍 TRANSACTION: Customer ID:", customerId);
-
     // If no userId from passthrough, try to find user by email
     if (!userId && customerEmail) {
-      console.log(
-        "🔍 TRANSACTION: No userId in passthrough, looking up user by email:",
-        customerEmail
-      );
+      console.log(`🔍 Looking up user by email: ${customerEmail}`);
       const userByEmail = await User.findOne({ email: customerEmail });
       if (userByEmail) {
         userId = userByEmail._id.toString();
@@ -350,28 +290,22 @@ const handleTransactionCompleted = async (data) => {
         } else if (priceId === process.env.PADDLE_LIFETIME_PRICE_ID) {
           productType = "lifetime";
         }
-        console.log("🔍 TRANSACTION: Found user by email:", userId);
-        console.log("🔍 TRANSACTION: Determined product type:", productType);
+        console.log(`✅ Found user: ${userId}, plan: ${productType}`);
       }
     }
 
-    console.log("🔍 TRANSACTION: Final User ID:", userId);
-    console.log("🔍 TRANSACTION: Final Product Type:", productType);
-
     if (!userId) {
-      console.error(
-        "🔍 TRANSACTION: No userId found in passthrough data or by email lookup"
-      );
+      console.error("❌ No userId found in transaction data");
       return;
     }
 
     const user = await User.findById(userId);
     if (!user) {
-      console.error("🔍 TRANSACTION: User not found:", userId);
+      console.error(`❌ User not found: ${userId}`);
       return;
     }
 
-    console.log("🔍 TRANSACTION: User found:", user.email);
+    console.log(`👤 Updating user: ${user.email}`);
 
     // Update user subscription status with plan limits
     const planLimits = {
@@ -379,13 +313,6 @@ const handleTransactionCompleted = async (data) => {
       pro: { links: 50, customDomains: 3 },
       lifetime: { links: 9999, customDomains: 10 },
     };
-
-    console.log(
-      "🔍 TRANSACTION: Plan limits for",
-      productType,
-      ":",
-      planLimits[productType]
-    );
 
     // Update subscription with proper error handling
     try {
@@ -419,25 +346,12 @@ const handleTransactionCompleted = async (data) => {
         user.usage.storageUsed = user.usage.storageUsed || 0;
       }
     } catch (updateError) {
-      console.error(
-        "🔍 TRANSACTION: Error updating user subscription:",
-        updateError
-      );
+      console.error("❌ Error updating user subscription:", updateError);
       throw updateError;
     }
 
-    console.log("🔍 TRANSACTION: Updating user subscription:", {
-      plan: productType,
-      status: "active",
-      transactionId: data.id,
-      customerId: customerId,
-      usageLimits: planLimits[productType],
-    });
-
     await user.save();
-    console.log(
-      `🔍 TRANSACTION: User ${userId} subscription activated successfully`
-    );
+    console.log(`🎉 User ${user.email} upgraded to ${productType} plan!`);
   } catch (error) {
     console.error("Error handling transaction completed:", error);
   }
