@@ -272,11 +272,16 @@ const handleWebhook = async (req, res) => {
 const handleTransactionCompleted = async (data) => {
   try {
     console.log(`💰 Processing transaction: ${data.id}`);
+    console.log(`📊 Transaction data:`, JSON.stringify(data, null, 2));
 
     // Try to get user data from customData first, then passthrough, then by email
     const customData = data.customData || {};
     const passthrough = data.passthrough ? JSON.parse(data.passthrough) : {};
     const userData = customData.userId ? customData : passthrough;
+
+    console.log(`🔍 Custom data:`, customData);
+    console.log(`🔍 Passthrough data:`, passthrough);
+    console.log(`📧 Customer email:`, data.customer?.email);
 
     let userId = userData.userId;
     let productType = userData.productType;
@@ -391,10 +396,14 @@ const handleSubscriptionCreated = async (data) => {
 const handleSubscriptionActivated = async (data) => {
   try {
     console.log(`🎯 Processing subscription activation: ${data.id}`);
+    console.log(`📊 Subscription data:`, JSON.stringify(data, null, 2));
 
     // Try to get user data from customData first, then by email
     const customData = data.customData || {};
     const customerEmail = data.customer?.email;
+
+    console.log(`🔍 Custom data:`, customData);
+    console.log(`📧 Customer email:`, customerEmail);
 
     let userId = customData.userId;
 
