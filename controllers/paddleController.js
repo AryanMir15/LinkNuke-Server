@@ -217,7 +217,15 @@ const handleWebhook = async (req, res) => {
           break;
 
         case "subscription.created":
+          console.log("✅ Processing subscription.created...");
           await handleSubscriptionCreated(event.data);
+          console.log("✅ Subscription created successfully");
+          break;
+
+        case "subscription.activated":
+          console.log("✅ Processing subscription.activated...");
+          await handleSubscriptionActivated(event.data);
+          console.log("✅ Subscription activated successfully");
           break;
 
         case "subscription.updated":
@@ -377,6 +385,95 @@ const handleSubscriptionCreated = async (data) => {
     }
   } catch (error) {
     console.error("Error handling subscription created:", error);
+  }
+};
+
+const handleSubscriptionActivated = async (data) => {
+  try {
+    console.log(`🎯 Processing subscription activation: ${data.id}`);
+
+    // Try to get user data from customData first, then by email
+    const customData = data.customData || {};
+    const customerEmail = data.customer?.email;
+
+    let userId = customData.userId;
+
+    // If no userId from customData, try to find user by email
+    if (!userId && customerEmail) {
+      console.log(`🔍 Looking up user by email: ${customerEmail}`);
+      const userByEmail = await User.findOne({ email: customerEmail });
+      if (userByEmail) {
+        userId = userByEmail._id.toString();
+        console.log(`✅ Found user: ${userId}`);
+      }
+    }
+
+    if (!userId) {
+      console.error("❌ No userId found in subscription data");
+      return;
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      console.error(`❌ User not found: ${userId}`);
+      return;
+    }
+
+    console.log(`👤 Activating subscription for: ${user.email}`);
+
+    // Determine plan type from subscription data
+    let productType = "pro"; // Default to pro for now
+    const priceId = data.items?.[0]?.price?.id;
+    if (priceId === process.env.PADDLE_STARTER_PRICE_ID) {
+      productType = "starter";
+    } else if (priceId === process.env.PADDLE_PRO_PRICE_ID) {
+      productType = "pro";
+    } else if (priceId === process.env.PADDLE_LIFETIME_PRICE_ID) {
+      productType = "lifetime";
+    }
+
+    // Update user subscription status with plan limits
+    const planLimits = {
+      starter: { links: 10, customDomains: 1 },
+      pro: { links: 50, customDomains: 3 },
+      lifetime: { links: 9999, customDomains: 10 },
+    };
+
+    user.subscription = {
+      status: "active",
+      plan: productType,
+      subscriptionId: data.id,
+      customerId: data.customer_id,
+      startDate: new Date(data.started_at || new Date()),
+      endDate:
+        productType === "lifetime"
+          ? null
+          : new Date(
+              data.next_billed_at ||
+                new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+            ),
+      usageLimits: planLimits[productType],
+      isTrial: false,
+      trialDays: 0,
+    };
+
+    // Initialize usage counters if they don't exist
+    if (!user.usage) {
+      user.usage = {
+        linksCreated: 0,
+        storageUsed: 0,
+      };
+    } else {
+      user.usage.linksCreated = user.usage.linksCreated || 0;
+      user.usage.storageUsed = user.usage.storageUsed || 0;
+    }
+
+    await user.save();
+    console.log(
+      `🎉 User ${user.email} subscription activated for ${productType} plan!`
+    );
+  } catch (error) {
+    console.error("Error handling subscription activated:", error);
   }
 };
 
