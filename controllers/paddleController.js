@@ -123,32 +123,50 @@ const createCheckoutSession = async (req, res) => {
       });
     }
 
-    // Create checkout session using Paddle API with customData for user identification
-    const checkoutData = {
-      items: [
-        {
-          priceId: product.priceId,
-          quantity: 1,
-        },
-      ],
-      customerEmail: user.email,
-      customData: {
-        userId: user._id.toString(),
-        productType: productType,
-        userEmail: user.email,
-      },
-      successUrl: `${process.env.CLIENT_URL}/dashboard?payment=success&userId=${user._id}&productType=${productType}`,
-      cancelUrl: `${process.env.CLIENT_URL}/pricing?payment=cancelled`,
-    };
+    // Use hosted checkout with customData for user identification
+    const isSandbox = process.env.PADDLE_ENV === "sandbox";
+    const baseUrl = isSandbox
+      ? "https://sandbox-pay.paddle.io/hsc_01k2hs7cq223hqjfjb1e37pm1b_zv8rjbpb4zteq84hdrf0v0k0g3wgfxt6"
+      : "https://checkout.paddle.com/hsc_01k2hs7cq223hqjfjb1e37pm1b_zv8rjbpb4zteq84hdrf0v0k0g3wgfxt6";
 
-    const checkoutResponse = await paddle.checkouts.create(checkoutData);
+    const hostedCheckoutUrl = new URL(baseUrl);
+
+    // Add the specific price_id for the selected plan
+    hostedCheckoutUrl.searchParams.set("price_id", product.priceId);
+    hostedCheckoutUrl.searchParams.set("quantity", "1");
+    hostedCheckoutUrl.searchParams.set("customer_email", user.email);
+
+    // Add custom data as passthrough for webhook identification
+    const customData = {
+      userId: user._id.toString(),
+      productType: productType,
+      userEmail: user.email,
+    };
+    hostedCheckoutUrl.searchParams.set(
+      "passthrough",
+      JSON.stringify(customData)
+    );
+
+    // Set redirect URLs
+    hostedCheckoutUrl.searchParams.set(
+      "success_url",
+      `${process.env.CLIENT_URL}/dashboard?payment=success&userId=${user._id}&productType=${productType}`
+    );
+    hostedCheckoutUrl.searchParams.set(
+      "cancel_url",
+      `${process.env.CLIENT_URL}/pricing?payment=cancelled`
+    );
+
+    // Optional: Add these for better UX
+    hostedCheckoutUrl.searchParams.set("disable_quantity", "true");
+    hostedCheckoutUrl.searchParams.set("disable_coupon", "true");
 
     console.log(`✅ Checkout URL created for ${product.name}`);
 
     const response = {
-      checkoutUrl: checkoutResponse.url,
-      transactionId: checkoutResponse.id,
-      originalCheckoutUrl: checkoutResponse.url,
+      checkoutUrl: hostedCheckoutUrl.toString(),
+      transactionId: null,
+      originalCheckoutUrl: hostedCheckoutUrl.toString(),
     };
 
     res.json(response);
