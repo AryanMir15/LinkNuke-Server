@@ -123,41 +123,32 @@ const createCheckoutSession = async (req, res) => {
       });
     }
 
-    // Use hosted checkout with customer_email for user identification
+    // Create checkout session using Paddle API with customData for user identification
+    const checkoutData = {
+      items: [
+        {
+          priceId: product.priceId,
+          quantity: 1,
+        },
+      ],
+      customerEmail: user.email,
+      customData: {
+        userId: user._id.toString(),
+        productType: productType,
+        userEmail: user.email,
+      },
+      successUrl: `${process.env.CLIENT_URL}/dashboard?payment=success&userId=${user._id}&productType=${productType}`,
+      cancelUrl: `${process.env.CLIENT_URL}/pricing?payment=cancelled`,
+    };
 
-    // Build the hosted checkout URL with parameters
-    const isSandbox = process.env.PADDLE_ENV === "sandbox";
-    const baseUrl = isSandbox
-      ? "https://sandbox-pay.paddle.io/hsc_01k2hs7cq223hqjfjb1e37pm1b_zv8rjbpb4zteq84hdrf0v0k0g3wgfxt6"
-      : "https://checkout.paddle.com/hsc_01k2hs7cq223hqjfjb1e37pm1b_zv8rjbpb4zteq84hdrf0v0k0g3wgfxt6";
-
-    const hostedCheckoutUrl = new URL(baseUrl);
-
-    // Add the specific price_id for the selected plan
-    hostedCheckoutUrl.searchParams.set("price_id", product.priceId);
-    hostedCheckoutUrl.searchParams.set("quantity", "1");
-    hostedCheckoutUrl.searchParams.set("customer_email", user.email);
-
-    // Set redirect URLs
-    hostedCheckoutUrl.searchParams.set(
-      "success_url",
-      `${process.env.CLIENT_URL}/dashboard?payment=success&userId=${user._id}&productType=${productType}`
-    );
-    hostedCheckoutUrl.searchParams.set(
-      "cancel_url",
-      `${process.env.CLIENT_URL}/pricing?payment=cancelled`
-    );
-
-    // Optional: Add these for better UX
-    hostedCheckoutUrl.searchParams.set("disable_quantity", "true");
-    hostedCheckoutUrl.searchParams.set("disable_coupon", "true");
+    const checkoutResponse = await paddle.checkouts.create(checkoutData);
 
     console.log(`✅ Checkout URL created for ${product.name}`);
 
     const response = {
-      checkoutUrl: hostedCheckoutUrl.toString(),
-      transactionId: null,
-      originalCheckoutUrl: hostedCheckoutUrl.toString(),
+      checkoutUrl: checkoutResponse.url,
+      transactionId: checkoutResponse.id,
+      originalCheckoutUrl: checkoutResponse.url,
     };
 
     res.json(response);
@@ -307,6 +298,18 @@ const handleTransactionCompleted = async (data) => {
       }
     }
 
+    // If still no userId, try to find user by customer ID (fallback)
+    if (!userId && customerId) {
+      console.log(`🔍 Looking up user by customer ID: ${customerId}`);
+      const userByCustomerId = await User.findOne({
+        "subscription.customerId": customerId,
+      });
+      if (userByCustomerId) {
+        userId = userByCustomerId._id.toString();
+        console.log(`✅ Found user by customer ID: ${userId}`);
+      }
+    }
+
     if (!userId) {
       console.error("❌ No userId found in transaction data");
       return;
@@ -414,6 +417,18 @@ const handleSubscriptionActivated = async (data) => {
       if (userByEmail) {
         userId = userByEmail._id.toString();
         console.log(`✅ Found user: ${userId}`);
+      }
+    }
+
+    // If still no userId, try to find user by customer ID (fallback)
+    if (!userId && data.customer_id) {
+      console.log(`🔍 Looking up user by customer ID: ${data.customer_id}`);
+      const userByCustomerId = await User.findOne({
+        "subscription.customerId": data.customer_id,
+      });
+      if (userByCustomerId) {
+        userId = userByCustomerId._id.toString();
+        console.log(`✅ Found user by customer ID: ${userId}`);
       }
     }
 
