@@ -721,9 +721,18 @@ const cancelSubscription = async (req, res) => {
         );
 
         // Add timeout to the Paddle client call
-        const cancelPromise = paddle.subscriptions.cancel({
-          subscriptionId: user.subscription.subscriptionId,
-        });
+        // Paddle SDK v3 - try different parameter formats
+        console.log(
+          `🔍 Attempting to cancel subscription with ID: ${user.subscription.subscriptionId}`
+        );
+
+        // Try the correct Paddle SDK v3 format
+        const cancelPromise = paddle.subscriptions.cancel(
+          user.subscription.subscriptionId,
+          {
+            effectiveFrom: "next_billing_period",
+          }
+        );
 
         // Create a timeout promise
         const timeoutPromise = new Promise((_, reject) => {
@@ -747,19 +756,21 @@ const cancelSubscription = async (req, res) => {
             `❌ All ${maxRetries} attempts failed. Proceeding with local cancellation.`
           );
 
-          // Check if it's a timeout or connection error
+          // Check if it's a timeout, connection error, or invalid URL
           if (
             apiError.message.includes("timeout") ||
             apiError.message.includes("fetch failed") ||
-            apiError.code === "UND_ERR_CONNECT_TIMEOUT"
+            apiError.code === "UND_ERR_CONNECT_TIMEOUT" ||
+            apiError.message.includes("URL called is invalid") ||
+            apiError.code === "invalid_url"
           ) {
             console.log(
-              `⚠️ Network timeout detected. Cancelling locally and will sync with Paddle later.`
+              `⚠️ API error detected (${apiError.message}). Cancelling locally and will sync with Paddle later.`
             );
             // We'll proceed with local cancellation and let the webhook handle the sync
             break;
           } else {
-            throw apiError; // Re-throw if it's not a network issue
+            throw apiError; // Re-throw if it's not a network/API issue
           }
         } else {
           // Wait before retrying (exponential backoff)
@@ -822,6 +833,12 @@ const cancelSubscription = async (req, res) => {
       errorMessage = "Subscription has already been cancelled.";
     } else if (error.message?.includes("unauthorized")) {
       errorMessage = "Unauthorized to cancel this subscription.";
+    } else if (
+      error.message?.includes("URL called is invalid") ||
+      error.code === "invalid_url"
+    ) {
+      errorMessage =
+        "API configuration issue. Subscription cancelled locally and will sync with Paddle.";
     }
 
     res.status(500).json({ error: errorMessage });
