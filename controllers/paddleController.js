@@ -1062,9 +1062,11 @@ const requestRefund = async (req, res) => {
     await user.save();
 
     try {
-      // Call Paddle API to process refund
-      const refundResult = await paddle.refunds.create({
-        transactionId: transactionId,
+      // Call Paddle API to process refund using adjustments endpoint
+      const refundResult = await paddle.adjustments.create({
+        action: "refund",
+        type: "full",
+        transaction_id: transactionId,
         reason: reason || "User requested refund",
       });
 
@@ -1073,7 +1075,7 @@ const requestRefund = async (req, res) => {
       // Update user with refund details
       user.subscription.refundStatus = "completed";
       user.subscription.refundedAt = new Date();
-      user.subscription.refundAmount = refundResult.amount || 0;
+      user.subscription.refundAmount = refundResult.data?.totals?.total || 0;
 
       // Immediately downgrade user to free plan
       user.subscription.status = "refunded";
@@ -1086,8 +1088,8 @@ const requestRefund = async (req, res) => {
       // Log successful refund completion
       logRefundActivity("completed", user, {
         transactionId: transactionId,
-        refundId: refundResult.id,
-        refundAmount: refundResult.amount,
+        refundId: refundResult.data?.id,
+        refundAmount: refundResult.data?.totals?.total,
         refundedAt: user.subscription.refundedAt,
         accessRemoved: true,
         downgradedTo: "free",
@@ -1095,8 +1097,8 @@ const requestRefund = async (req, res) => {
 
       res.json({
         message: "Refund processed successfully",
-        refundId: refundResult.id,
-        refundAmount: refundResult.amount,
+        refundId: refundResult.data?.id,
+        refundAmount: refundResult.data?.totals?.total,
         refundedAt: user.subscription.refundedAt,
         accessRemoved: true,
       });
