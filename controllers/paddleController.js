@@ -1040,9 +1040,9 @@ const requestRefund = async (req, res) => {
 
     try {
       // Call Paddle API to process refund
-      const refundResult = await paddle.transactions.refund(transactionId, {
+      const refundResult = await paddle.refunds.create({
+        transactionId: transactionId,
         reason: reason || "User requested refund",
-        amount: null, // Full refund
       });
 
       console.log(`✅ Refund processed successfully:`, refundResult);
