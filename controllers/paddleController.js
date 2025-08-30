@@ -698,22 +698,133 @@ const cancelSubscription = async (req, res) => {
     }
 
     const user = req.user;
+    console.log(`🔄 Attempting to cancel subscription for user: ${user.email}`);
 
     if (!user.subscription?.subscriptionId) {
+      console.error("No subscription ID found for user:", user.email);
       return res.status(400).json({ error: "No active subscription found" });
     }
 
-    await paddle.subscriptions.cancel({
-      subscriptionId: user.subscription.subscriptionId,
+    console.log(`📋 Subscription ID: ${user.subscription.subscriptionId}`);
+
+    // Call Paddle API to cancel subscription with timeout and retry logic
+    let cancelResult;
+    let retryCount = 0;
+    const maxRetries = 3;
+
+    while (retryCount < maxRetries) {
+      try {
+        console.log(
+          `🔄 Attempting Paddle API call (attempt ${
+            retryCount + 1
+          }/${maxRetries})`
+        );
+
+        // Add timeout to the Paddle client call
+        const cancelPromise = paddle.subscriptions.cancel({
+          subscriptionId: user.subscription.subscriptionId,
+        });
+
+        // Create a timeout promise
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error("Paddle API timeout")), 15000); // 15 second timeout
+        });
+
+        // Race between the API call and timeout
+        cancelResult = await Promise.race([cancelPromise, timeoutPromise]);
+        console.log(`✅ Paddle cancellation response:`, cancelResult);
+        break; // Success, exit retry loop
+      } catch (apiError) {
+        retryCount++;
+        console.error(
+          `❌ Paddle API call failed (attempt ${retryCount}/${maxRetries}):`,
+          apiError.message
+        );
+
+        if (retryCount >= maxRetries) {
+          // If all retries failed, we'll still update the local database
+          console.error(
+            `❌ All ${maxRetries} attempts failed. Proceeding with local cancellation.`
+          );
+
+          // Check if it's a timeout or connection error
+          if (
+            apiError.message.includes("timeout") ||
+            apiError.message.includes("fetch failed") ||
+            apiError.code === "UND_ERR_CONNECT_TIMEOUT"
+          ) {
+            console.log(
+              `⚠️ Network timeout detected. Cancelling locally and will sync with Paddle later.`
+            );
+            // We'll proceed with local cancellation and let the webhook handle the sync
+            break;
+          } else {
+            throw apiError; // Re-throw if it's not a network issue
+          }
+        } else {
+          // Wait before retrying (exponential backoff)
+          const waitTime = Math.pow(2, retryCount) * 1000; // 2s, 4s, 8s
+          console.log(`⏳ Waiting ${waitTime}ms before retry...`);
+          await new Promise((resolve) => setTimeout(resolve, waitTime));
+        }
+      }
+    }
+
+    // Update user subscription status
+    user.subscription.status = "cancelled";
+    user.subscription.cancelledAt = new Date();
+
+    // Set end date to current billing period end or immediate if not available
+    if (user.subscription.endDate && user.subscription.endDate > new Date()) {
+      // Keep access until end of current billing period
+      console.log(
+        `📅 Subscription will remain active until: ${user.subscription.endDate}`
+      );
+    } else {
+      // Immediate cancellation
+      user.subscription.endDate = new Date();
+      console.log(`⏰ Subscription cancelled immediately`);
+    }
+
+    await user.save();
+    console.log(
+      `✅ Subscription cancelled successfully for user: ${user.email}`
+    );
+
+    // Determine if this was a local cancellation due to network issues
+    const wasLocalCancellation = retryCount >= maxRetries && !cancelResult;
+    const message = wasLocalCancellation
+      ? "Subscription cancelled locally. Paddle API sync will be completed via webhook."
+      : "Subscription cancelled successfully";
+
+    res.json({
+      message: message,
+      cancelledAt: user.subscription.cancelledAt,
+      accessUntil: user.subscription.endDate,
+      localCancellation: wasLocalCancellation,
+    });
+  } catch (error) {
+    console.error("❌ Error cancelling subscription:", error);
+    console.error("Error details:", {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      type: error.type,
+      errors: error.errors,
     });
 
-    user.subscription.status = "cancelled";
-    await user.save();
+    // Provide more specific error messages
+    let errorMessage = "Failed to cancel subscription";
+    if (error.message?.includes("not found")) {
+      errorMessage =
+        "Subscription not found. It may have already been cancelled.";
+    } else if (error.message?.includes("already cancelled")) {
+      errorMessage = "Subscription has already been cancelled.";
+    } else if (error.message?.includes("unauthorized")) {
+      errorMessage = "Unauthorized to cancel this subscription.";
+    }
 
-    res.json({ message: "Subscription cancelled successfully" });
-  } catch (error) {
-    console.error("Error cancelling subscription:", error);
-    res.status(500).json({ error: "Failed to cancel subscription" });
+    res.status(500).json({ error: errorMessage });
   }
 };
 
