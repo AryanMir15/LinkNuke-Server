@@ -8,6 +8,8 @@ const {
   updateSubscription,
   startTrial,
   getClientToken,
+  requestRefund,
+  getRefundPolicyInfo,
 } = require("../controllers/paddleController");
 const authMiddleware = require("../middleware/auth");
 
@@ -31,5 +33,7 @@ router.post("/start-trial", authMiddleware, startTrial);
 router.get("/subscription-status", authMiddleware, getSubscriptionStatus);
 router.post("/cancel-subscription", authMiddleware, cancelSubscription);
 router.put("/update-subscription", authMiddleware, updateSubscription);
+router.post("/request-refund", authMiddleware, requestRefund);
+router.get("/refund-policy", authMiddleware, getRefundPolicyInfo);
 
 module.exports = router;

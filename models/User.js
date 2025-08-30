@@ -39,7 +39,7 @@ const UserSchema = new mongoose.Schema(
     subscription: {
       status: {
         type: String,
-        enum: ["active", "inactive", "cancelled"],
+        enum: ["active", "inactive", "cancelled", "refunded"],
         default: "active",
       },
       plan: {
@@ -65,6 +65,16 @@ const UserSchema = new mongoose.Schema(
         type: Number,
         default: 0,
       },
+      // Refund tracking fields
+      refundedAt: Date,
+      refundAmount: Number,
+      refundReason: String,
+      refundStatus: {
+        type: String,
+        enum: ["none", "requested", "processing", "completed", "failed"],
+        default: "none",
+      },
+      firstPaymentDate: Date, // Track first payment for 15-day window
     },
     usage: {
       linksCreated: {
