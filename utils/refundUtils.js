@@ -46,8 +46,12 @@ const checkRefundEligibility = (subscription) => {
     };
   }
 
-  // Check if refund already requested
-  if (subscription.refundStatus && subscription.refundStatus !== "none") {
+  // Check if refund already requested (but allow retry for failed refunds)
+  if (
+    subscription.refundStatus &&
+    subscription.refundStatus !== "none" &&
+    subscription.refundStatus !== "failed"
+  ) {
     return {
       eligible: false,
       reason: `Refund already ${subscription.refundStatus}`,
@@ -203,4 +207,3 @@ module.exports = {
   getRefundPolicy,
   logRefundActivity,
 };
-

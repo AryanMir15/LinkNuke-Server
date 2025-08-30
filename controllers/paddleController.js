@@ -651,14 +651,32 @@ const getSubscriptionStatus = async (req, res) => {
   try {
     const user = req.user;
 
+    // Define correct plan limits
+    const planLimits = {
+      free: { links: 10, customDomains: 1 },
+      starter: { links: 10, customDomains: 1 },
+      pro: { links: 500, customDomains: 3 },
+      lifetime: { links: 9999, customDomains: 10 },
+    };
+
     // Ensure user has subscription and usage data
     if (!user.subscription) {
       user.subscription = {
         status: "active",
         plan: "free",
-        usageLimits: { links: 10, customDomains: 1 },
+        usageLimits: planLimits.free,
       };
       await user.save();
+    } else {
+      // Ensure usageLimits are correct for the current plan
+      const currentPlan = user.subscription.plan || "free";
+      if (
+        !user.subscription.usageLimits ||
+        user.subscription.usageLimits.links !== planLimits[currentPlan].links
+      ) {
+        user.subscription.usageLimits = planLimits[currentPlan];
+        await user.save();
+      }
     }
 
     if (!user.usage) {
@@ -685,15 +703,20 @@ const getSubscriptionStatus = async (req, res) => {
       : null;
 
     // Extract billing period dates
-    const billingPeriod = user.subscription.endDate
-      ? {
-          start: user.subscription.startDate,
-          end: user.subscription.endDate,
-          remaining_days: Math.ceil(
-            (user.subscription.endDate - Date.now()) / (1000 * 60 * 60 * 24)
-          ),
-        }
-      : null;
+    const billingPeriod =
+      user.subscription.endDate && user.subscription.startDate
+        ? {
+            start: user.subscription.startDate,
+            end: user.subscription.endDate,
+            remaining_days: Math.max(
+              0,
+              Math.ceil(
+                (new Date(user.subscription.endDate) - Date.now()) /
+                  (1000 * 60 * 60 * 24)
+              )
+            ),
+          }
+        : null;
 
     res.json({
       hasSubscription: true,
