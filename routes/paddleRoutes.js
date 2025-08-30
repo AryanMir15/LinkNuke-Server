@@ -10,7 +10,7 @@ const {
   getClientToken,
   requestRefund,
   getRefundPolicyInfo,
-} = require("../controllers/paddleController");
+} = require("../controllers/paddle");
 const authMiddleware = require("../middleware/auth");
 
 // Public webhook endpoint (no auth required)
