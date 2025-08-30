@@ -88,8 +88,8 @@ const requestRefund = async (req, res) => {
       // Update user with refund details
       user.subscription.refundStatus = "completed";
       user.subscription.refundedAt = new Date();
-      user.subscription.refundAmount = refundResult.data?.totals?.total
-        ? refundResult.data.totals.total / 100
+      user.subscription.refundAmount = refundResult.totals?.total
+        ? refundResult.totals.total / 100
         : 0;
 
       // Immediately downgrade user to free plan
@@ -104,8 +104,8 @@ const requestRefund = async (req, res) => {
       logRefundActivity("completed", user, {
         transactionId: transactionId,
         refundId: refundResult.data?.id,
-        refundAmount: refundResult.data?.totals?.total
-          ? (refundResult.data.totals.total / 100).toFixed(2)
+        refundAmount: refundResult.totals?.total
+          ? (refundResult.totals.total / 100).toFixed(2)
           : 0,
         refundedAt: user.subscription.refundedAt,
         accessRemoved: true,
@@ -115,8 +115,8 @@ const requestRefund = async (req, res) => {
       res.json({
         message: "Refund processed successfully",
         refundId: refundResult.data?.id,
-        refundAmount: refundResult.data?.totals?.total
-          ? (refundResult.data.totals.total / 100).toFixed(2)
+        refundAmount: refundResult.totals?.total
+          ? (refundResult.totals.total / 100).toFixed(2)
           : 0,
         refundedAt: user.subscription.refundedAt,
         accessRemoved: true,
