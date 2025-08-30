@@ -271,7 +271,7 @@ const handleSubscriptionActivated = async (data) => {
             // Determine product type from subscription items
             let productType = "starter"; // default
             if (data.items && data.items.length > 0) {
-              const priceId = data.items[0].priceId;
+              const priceId = data.items[0].price?.id;
               console.log(`💰 Price ID: ${priceId}`);
 
               // Map price ID to product type
