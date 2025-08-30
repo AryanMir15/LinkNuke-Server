@@ -75,7 +75,7 @@ const register = async (req, res) => {
       subscription: {
         status: "inactive",
         plan: "free",
-        usageLimits: { links: 10, customDomains: 1 },
+        usageLimits: { links: 5, customDomains: 1 },
       },
     });
 

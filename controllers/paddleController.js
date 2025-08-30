@@ -605,7 +605,7 @@ const handleTransactionRefunded = async (data) => {
         user.subscription.refundAmount = data.amount || 0;
         user.subscription.status = "refunded";
         user.subscription.plan = "free";
-        user.subscription.usageLimits = { links: 10, customDomains: 1 };
+        user.subscription.usageLimits = { links: 5, customDomains: 1 };
         user.subscription.endDate = new Date(); // Immediate access removal
 
         await user.save();
@@ -653,7 +653,7 @@ const getSubscriptionStatus = async (req, res) => {
 
     // Define correct plan limits
     const planLimits = {
-      free: { links: 10, customDomains: 1 },
+      free: { links: 5, customDomains: 1 },
       starter: { links: 10, customDomains: 1 },
       pro: { links: 500, customDomains: 3 },
       lifetime: { links: 9999, customDomains: 10 },
@@ -1075,12 +1075,14 @@ const requestRefund = async (req, res) => {
       // Update user with refund details
       user.subscription.refundStatus = "completed";
       user.subscription.refundedAt = new Date();
-      user.subscription.refundAmount = refundResult.data?.totals?.total || 0;
+      user.subscription.refundAmount = refundResult.data?.totals?.total
+        ? n(refundResult.data.totals.total / 100)
+        : 0;
 
       // Immediately downgrade user to free plan
       user.subscription.status = "refunded";
       user.subscription.plan = "free";
-      user.subscription.usageLimits = { links: 10, customDomains: 1 };
+      user.subscription.usageLimits = { links: 5, customDomains: 1 };
       user.subscription.endDate = new Date(); // Immediate access removal
 
       await user.save();
@@ -1089,7 +1091,9 @@ const requestRefund = async (req, res) => {
       logRefundActivity("completed", user, {
         transactionId: transactionId,
         refundId: refundResult.data?.id,
-        refundAmount: refundResult.data?.totals?.total,
+        refundAmount: refundResult.data?.totals?.total
+          ? n(refundResult.data.totals.total / 100).toFixed(2)
+          : 0,
         refundedAt: user.subscription.refundedAt,
         accessRemoved: true,
         downgradedTo: "free",
@@ -1098,7 +1102,9 @@ const requestRefund = async (req, res) => {
       res.json({
         message: "Refund processed successfully",
         refundId: refundResult.data?.id,
-        refundAmount: refundResult.data?.totals?.total,
+        refundAmount: refundResult.data?.totals?.total
+          ? n(refundResult.data.totals.total / 100).toFixed(2)
+          : 0,
         refundedAt: user.subscription.refundedAt,
         accessRemoved: true,
       });

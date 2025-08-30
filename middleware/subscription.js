@@ -10,7 +10,7 @@ const checkSubscription = (requiredPlan) => async (req, res, next) => {
     user.subscription = {
       status: "active",
       plan: "free",
-      usageLimits: { links: 10, customDomains: 1 },
+      usageLimits: { links: 5, customDomains: 1 },
     };
     await user.save();
   }

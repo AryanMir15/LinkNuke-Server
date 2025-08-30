@@ -275,7 +275,7 @@ describe("Refund Business Logic", () => {
       const refundedSubscription = {
         status: "refunded",
         plan: "free",
-        usageLimits: { links: 10, customDomains: 1 },
+        usageLimits: { links: 5, customDomains: 1 },
         endDate: new Date(),
       };
 
@@ -343,4 +343,3 @@ module.exports = {
     ...overrides,
   }),
 };
-
