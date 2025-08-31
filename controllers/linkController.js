@@ -132,6 +132,9 @@ const createLink = async (req, res) => {
       documentUrl: link.documentUrl,
     };
 
+    console.log("🔍 Link created - URL:", link.url);
+    console.log("🔍 Link created - LinkId:", link.linkId);
+
     // Cache successful response if idempotency key exists
     if (idempotencyKey) {
       // TODO: Implement proper idempotency with redis
