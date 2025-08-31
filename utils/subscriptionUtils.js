@@ -61,7 +61,6 @@ const canCreateLink = async (userId) => {
         reason: `Monthly limit of ${limits.linksPerMonth} links reached. Upgrade your plan for more.`,
       };
     }
-
     return { allowed: true };
   } catch (error) {
     console.error("Error checking link creation permission:", error);

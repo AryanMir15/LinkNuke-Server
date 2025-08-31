@@ -105,6 +105,11 @@ const createLink = async (req, res) => {
     const link = new Link(linkData);
     await link.save();
 
+    // Increment total links created counter (never decreases)
+    await User.findByIdAndUpdate(userId, {
+      $inc: { "usage.totalLinksCreated": 1 },
+    });
+
     // Usage is updated by the trackUsage middleware
     console.log("Link saved successfully:", link._id);
 

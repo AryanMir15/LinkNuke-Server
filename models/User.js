@@ -81,6 +81,10 @@ const UserSchema = new mongoose.Schema(
         type: Number,
         default: 0,
       },
+      totalLinksCreated: {
+        type: Number,
+        default: 0, // Total links ever created (never decreases)
+      },
       storageUsed: {
         type: Number,
         default: 0, // in bytes
