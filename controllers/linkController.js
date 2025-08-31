@@ -260,16 +260,31 @@ const trackLinkView = async (req, res) => {
   try {
     const { id } = req.params; // Changed from linkId to id to match route
     const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
+
+    console.log("🔍 trackLinkView: Tracking link ID:", id);
+    console.log("🔍 trackLinkView: IP address:", ip);
+
     const link = await Link.findOne({ _id: id, deleted: false }); // Don't track deleted links
-    if (!link) return res.status(404).json({ error: "Link not found" });
+    if (!link) {
+      console.log("🔍 trackLinkView: Link not found");
+      return res.status(404).json({ error: "Link not found" });
+    }
+
+    console.log("🔍 trackLinkView: Link found - current views:", link.views);
+    console.log("🔍 trackLinkView: Max views:", link.maxViews);
+    console.log("🔍 trackLinkView: ViewersIPs:", link.viewersIPs);
 
     // Prevent duplicate views from same IP
     if (link.viewersIPs?.includes(ip)) {
+      console.log(
+        "🔍 trackLinkView: Duplicate view from same IP - not counting"
+      );
       return res.json({ success: true }); // Don't count but still return success
     }
 
     // Check view limits and expiration
     if (link.views >= (link.maxViews || 0)) {
+      console.log("🔍 trackLinkView: View limit reached");
       link.status = "Expired";
       await link.save();
       return res
@@ -278,15 +293,31 @@ const trackLinkView = async (req, res) => {
     }
 
     if (link.expiresAt && new Date() > new Date(link.expiresAt)) {
+      console.log("🔍 trackLinkView: Link expired");
       link.status = "Expired";
       await link.save();
       return res.status(410).json({ success: false, error: "Link expired" });
     }
 
+    console.log(
+      "🔍 trackLinkView: Incrementing views from",
+      link.views,
+      "to",
+      (link.views || 0) + 1
+    );
     link.views = (link.views || 0) + 1;
+
+    // Add IP to viewersIPs array
+    if (!link.viewersIPs) {
+      link.viewersIPs = [];
+    }
+    link.viewersIPs.push(ip);
+
     await link.save();
+    console.log("🔍 trackLinkView: Link saved successfully");
     res.json({ success: true });
   } catch (error) {
+    console.error("🔍 trackLinkView: Error:", error);
     res.status(500).json({ error: "Something went wrong" });
   }
 };

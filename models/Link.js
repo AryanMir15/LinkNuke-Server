@@ -82,6 +82,10 @@ const LinkSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    viewersIPs: {
+      type: [String],
+      default: [],
+    },
     deleted: {
       type: Boolean,
       default: false,
