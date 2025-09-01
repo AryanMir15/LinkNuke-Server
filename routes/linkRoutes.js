@@ -14,13 +14,13 @@ const {
 const router = express.Router();
 
 router.delete("/links/:id", deleteLink);
+router.post("/links/track/:id", trackLinkView);
 router.get("/links/usage-stats", getUsageStats);
 router.get("/links/:id", getSingleLink);
 router.post("/links", checkSubscription(), trackUsage("link"), createLink);
 router.get("/links", getAllLinks);
 router.patch("/links/:id", updateLink);
-// Public routes for preview and sharing
+// Public route for preview and sharing
 router.get("/public/links/:linkId", getLinkByLinkId);
-router.post("/public/links/track/:id", trackLinkView);
 
 module.exports = router;
