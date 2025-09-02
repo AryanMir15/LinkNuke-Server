@@ -258,28 +258,44 @@ const getSingleLink = async (req, res) => {
 // Track link view
 const trackLinkView = async (req, res) => {
   try {
-    const { id } = req.params; // Changed from linkId to id to match route
+    const { id } = req.params; // This is now the _id from the database
     const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
     const isCreatorPreview =
       req.headers["x-creator-preview"] === "true" ||
       req.query.preview === "creator";
 
-    console.log("🔍 trackLinkView: Tracking link ID:", id);
-    console.log("🔍 trackLinkView: IP address:", ip);
-    console.log("🔍 trackLinkView: Is creator preview:", isCreatorPreview);
+    // Use process.stdout.write for server-level logging that will appear in production logs
+    process.stdout.write(`🔍 TRACK: Starting tracking for link ID: ${id}\n`);
+    process.stdout.write(`🔍 TRACK: IP address: ${ip}\n`);
+    process.stdout.write(`🔍 TRACK: Is creator preview: ${isCreatorPreview}\n`);
+    process.stdout.write(
+      `🔍 TRACK: Query params: ${JSON.stringify(req.query)}\n`
+    );
+    process.stdout.write(`🔍 TRACK: Headers: ${JSON.stringify(req.headers)}\n`);
 
-    const link = await Link.findOne({ _id: id, deleted: false }); // Don't track deleted links
+    // Validate MongoDB ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      process.stdout.write(`🔍 TRACK: Invalid ObjectId format: ${id}\n`);
+      return res.status(400).json({ error: "Invalid link ID format" });
+    }
+
+    // Find link by _id (MongoDB ObjectId) instead of linkId
+    const link = await Link.findOne({ _id: id, deleted: false });
     if (!link) {
-      console.log("🔍 trackLinkView: Link not found");
+      process.stdout.write(`🔍 TRACK: Link not found for _id: ${id}\n`);
       return res.status(404).json({ error: "Link not found" });
     }
 
-    console.log("🔍 trackLinkView: Link found - current views:", link.views);
-    console.log("🔍 trackLinkView: Max views:", link.maxViews);
+    process.stdout.write(
+      `🔍 TRACK: Link found - current views: ${link.views}\n`
+    );
+    process.stdout.write(`🔍 TRACK: Max views: ${link.maxViews}\n`);
+    process.stdout.write(`🔍 TRACK: Link title: ${link.title}\n`);
+    process.stdout.write(`🔍 TRACK: Link linkId: ${link.linkId}\n`);
 
     // Check view limits and expiration
     if (link.views >= (link.maxViews || 0)) {
-      console.log("🔍 trackLinkView: View limit reached");
+      process.stdout.write(`🔍 TRACK: View limit reached for link: ${id}\n`);
       link.status = "Expired";
       await link.save();
       return res
@@ -288,7 +304,7 @@ const trackLinkView = async (req, res) => {
     }
 
     if (link.expiresAt && new Date() > new Date(link.expiresAt)) {
-      console.log("🔍 trackLinkView: Link expired");
+      process.stdout.write(`🔍 TRACK: Link expired for link: ${id}\n`);
       link.status = "Expired";
       await link.save();
       return res.status(410).json({ success: false, error: "Link expired" });
@@ -296,13 +312,13 @@ const trackLinkView = async (req, res) => {
 
     // Only count views if it's NOT a creator preview
     if (!isCreatorPreview) {
-      console.log(
-        "🔍 trackLinkView: Incrementing views from",
-        link.views,
-        "to",
-        (link.views || 0) + 1
+      const oldViews = link.views || 0;
+      const newViews = oldViews + 1;
+
+      process.stdout.write(
+        `🔍 TRACK: INCREMENTING VIEWS from ${oldViews} to ${newViews}\n`
       );
-      link.views = (link.views || 0) + 1;
+      link.views = newViews;
 
       // Still store IP for analytics purposes, but don't use it to prevent counting
       if (!link.viewersIPs) {
@@ -311,14 +327,24 @@ const trackLinkView = async (req, res) => {
       link.viewersIPs.push(ip);
 
       await link.save();
-      console.log("🔍 trackLinkView: Link saved successfully - view counted");
+      process.stdout.write(
+        `🔍 TRACK: SUCCESS - View counted and saved for link: ${id}\n`
+      );
     } else {
-      console.log("🔍 trackLinkView: Creator preview - view not counted");
+      process.stdout.write(
+        `🔍 TRACK: Creator preview - view NOT counted for link: ${id}\n`
+      );
     }
 
+    process.stdout.write(
+      `🔍 TRACK: Sending success response for link: ${id}\n`
+    );
     res.json({ success: true });
   } catch (error) {
-    console.error("🔍 trackLinkView: Error:", error);
+    process.stdout.write(
+      `🔍 TRACK: ERROR tracking link ${req.params.id}: ${error.message}\n`
+    );
+    process.stdout.write(`🔍 TRACK: Error stack: ${error.stack}\n`);
     res.status(500).json({ error: "Something went wrong" });
   }
 };
