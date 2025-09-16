@@ -11,7 +11,6 @@ const {
 // Validate required environment variables (but don't crash the app)
 const requiredEnvVars = [
   "PADDLE_API_KEY",
-  "PADDLE_CLIENT_TOKEN",
   "PADDLE_PRO_PRICE_ID",
   "PADDLE_LIFETIME_PRICE_ID",
   "CLIENT_URL",
