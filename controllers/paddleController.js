@@ -127,7 +127,7 @@ const createCheckoutSession = async (req, res) => {
     const isSandbox = process.env.PADDLE_ENV === "sandbox";
     const baseUrl = isSandbox
       ? "https://sandbox-pay.paddle.io/hsc_01k2hs7cq223hqjfjb1e37pm1b_zv8rjbpb4zteq84hdrf0v0k0g3wgfxt6"
-      : "https://checkout.paddle.com/hsc_01k2hs7cq223hqjfjb1e37pm1b_zv8rjbpb4zteq84hdrf0v0k0g3wgfxt6";
+      : "https://pay.paddle.io/hsc_01k56t83qemqtktx2f6f1b45e6_f4vvezpggd0vfzdbrh74qyx71nh1xv1w";
 
     const hostedCheckoutUrl = new URL(baseUrl);
 

@@ -46,49 +46,43 @@ const createCheckoutSession = async (req, res) => {
       });
     }
 
-    // Use Paddle API to create a proper checkout session
-    try {
-      const checkoutResponse = await paddle.transactions.create({
-        items: [
-          {
-            priceId: product.priceId,
-            quantity: 1,
-          },
-        ],
-        customerEmail: user.email,
-        customData: {
-          userId: user._id.toString(),
-          productType: productType,
-        },
-        successUrl: `${process.env.CLIENT_URL}/dashboard?payment=success&userId=${user._id}&productType=${productType}`,
-        cancelUrl: `${process.env.CLIENT_URL}/pricing?payment=cancelled`,
-      });
+    // Use the original working hosted checkout approach
+    const isSandbox = process.env.PADDLE_ENV === "sandbox";
+    const baseUrl = isSandbox
+      ? "https://sandbox-pay.paddle.io/hsc_01k2hs7cq223hqjfjb1e37pm1b_zv8rjbpb4zteq84hdrf0v0k0g3wgfxt6"
+      : "https://pay.paddle.io/hsc_01k56t83qemqtktx2f6f1b45e6_f4vvezpggd0vfzdbrh74qyx71nh1xv1w";
 
-      console.log(`✅ Checkout session created for ${product.name}`);
-      console.log(`Checkout URL: ${checkoutResponse.checkoutUrl}`);
+    const hostedCheckoutUrl = new URL(baseUrl);
 
-      const response = {
-        checkoutUrl: checkoutResponse.checkoutUrl,
-        transactionId: checkoutResponse.id,
-        originalCheckoutUrl: checkoutResponse.checkoutUrl,
-      };
+    // Add the specific price_id for the selected plan
+    hostedCheckoutUrl.searchParams.set("price_id", product.priceId);
+    hostedCheckoutUrl.searchParams.set("quantity", "1");
+    hostedCheckoutUrl.searchParams.set("customer_email", user.email);
 
-      res.json(response);
-    } catch (paddleError) {
-      console.error("Paddle API error:", paddleError);
-      console.error("Paddle error details:", {
-        message: paddleError.message,
-        code: paddleError.code,
-        detail: paddleError.detail,
-        type: paddleError.type,
-        errors: paddleError.errors,
-      });
+    // Set redirect URLs
+    hostedCheckoutUrl.searchParams.set(
+      "success_url",
+      `${process.env.CLIENT_URL}/dashboard?payment=success&userId=${user._id}&productType=${productType}`
+    );
+    hostedCheckoutUrl.searchParams.set(
+      "cancel_url",
+      `${process.env.CLIENT_URL}/pricing?payment=cancelled`
+    );
 
-      return res.status(500).json({
-        error: "Failed to create checkout session with Paddle",
-        details: paddleError.message,
-      });
-    }
+    // Optional: Add these for better UX
+    hostedCheckoutUrl.searchParams.set("disable_quantity", "true");
+    hostedCheckoutUrl.searchParams.set("disable_coupon", "true");
+
+    console.log(`✅ Checkout URL created for ${product.name}`);
+    console.log(`Checkout URL: ${hostedCheckoutUrl.toString()}`);
+
+    const response = {
+      checkoutUrl: hostedCheckoutUrl.toString(),
+      transactionId: null,
+      originalCheckoutUrl: hostedCheckoutUrl.toString(),
+    };
+
+    res.json(response);
   } catch (error) {
     console.error("Checkout creation error:", error);
     console.error("Error stack:", error.stack);
