@@ -46,49 +46,56 @@ const createCheckoutSession = async (req, res) => {
       });
     }
 
-    // Use Paddle API to create a proper checkout session
-    try {
-      const checkoutResponse = await paddle.transactions.create({
-        items: [
-          {
-            priceId: product.priceId,
-            quantity: 1,
-          },
-        ],
-        customerEmail: user.email,
-        customData: {
-          userId: user._id.toString(),
-          productType: productType,
-        },
-        successUrl: `${process.env.CLIENT_URL}/dashboard?payment=success&userId=${user._id}&productType=${productType}`,
-        cancelUrl: `${process.env.CLIENT_URL}/pricing?payment=cancelled`,
-      });
+    // Use hosted checkout with proper client token
+    const isSandbox = process.env.PADDLE_ENV === "sandbox";
+    const clientToken = process.env.PADDLE_CLIENT_TOKEN;
 
-      console.log(`✅ Checkout session created for ${product.name}`);
-      console.log(`Checkout URL: ${checkoutResponse.checkoutUrl}`);
-
-      const response = {
-        checkoutUrl: checkoutResponse.checkoutUrl,
-        transactionId: checkoutResponse.id,
-        originalCheckoutUrl: checkoutResponse.checkoutUrl,
-      };
-
-      res.json(response);
-    } catch (paddleError) {
-      console.error("Paddle API error:", paddleError);
-      console.error("Paddle error details:", {
-        message: paddleError.message,
-        code: paddleError.code,
-        detail: paddleError.detail,
-        type: paddleError.type,
-        errors: paddleError.errors,
-      });
-
+    if (!clientToken) {
+      console.error("PADDLE_CLIENT_TOKEN not found in environment variables");
       return res.status(500).json({
-        error: "Failed to create checkout session with Paddle",
-        details: paddleError.message,
+        error: "Payment configuration error. Please contact support.",
       });
     }
+
+    const baseUrl = isSandbox
+      ? `https://sandbox-pay.paddle.io/${clientToken}`
+      : `https://checkout.paddle.com/${clientToken}`;
+
+    const hostedCheckoutUrl = new URL(baseUrl);
+
+    // Add the specific price_id for the selected plan
+    hostedCheckoutUrl.searchParams.set("price_id", product.priceId);
+    hostedCheckoutUrl.searchParams.set("quantity", "1");
+    hostedCheckoutUrl.searchParams.set("customer_email", user.email);
+
+    // Store user mapping for webhook identification
+    // Since passthrough doesn't work with hosted checkout, we'll use customer email lookup
+    // The customer email will be set in the checkout URL and we can look it up in webhooks
+
+    // Set redirect URLs
+    hostedCheckoutUrl.searchParams.set(
+      "success_url",
+      `${process.env.CLIENT_URL}/dashboard?payment=success&userId=${user._id}&productType=${productType}`
+    );
+    hostedCheckoutUrl.searchParams.set(
+      "cancel_url",
+      `${process.env.CLIENT_URL}/pricing?payment=cancelled`
+    );
+
+    // Optional: Add these for better UX
+    hostedCheckoutUrl.searchParams.set("disable_quantity", "true");
+    hostedCheckoutUrl.searchParams.set("disable_coupon", "true");
+
+    console.log(`✅ Checkout URL created for ${product.name}`);
+    console.log(`Checkout URL: ${hostedCheckoutUrl.toString()}`);
+
+    const response = {
+      checkoutUrl: hostedCheckoutUrl.toString(),
+      transactionId: null,
+      originalCheckoutUrl: hostedCheckoutUrl.toString(),
+    };
+
+    res.json(response);
   } catch (error) {
     console.error("Checkout creation error:", error);
     console.error("Error stack:", error.stack);
