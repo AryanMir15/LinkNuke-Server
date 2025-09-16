@@ -46,11 +46,20 @@ const createCheckoutSession = async (req, res) => {
       });
     }
 
-    // Use hosted checkout with customData for user identification
+    // Use hosted checkout with proper client token
     const isSandbox = process.env.PADDLE_ENV === "sandbox";
+    const clientToken = process.env.PADDLE_CLIENT_TOKEN;
+
+    if (!clientToken) {
+      console.error("PADDLE_CLIENT_TOKEN not found in environment variables");
+      return res.status(500).json({
+        error: "Payment configuration error. Please contact support.",
+      });
+    }
+
     const baseUrl = isSandbox
-      ? "https://sandbox-pay.paddle.io/hsc_01k2hs7cq223hqjfjb1e37pm1b_zv8rjbpb4zteq84hdrf0v0k0g3wgfxt6"
-      : "https://checkout.paddle.com/hsc_01k2hs7cq223hqjfjb1e37pm1b_zv8rjbpb4zteq84hdrf0v0k0g3wgfxt6";
+      ? `https://sandbox-pay.paddle.io/${clientToken}`
+      : `https://checkout.paddle.com/${clientToken}`;
 
     const hostedCheckoutUrl = new URL(baseUrl);
 

@@ -3,7 +3,7 @@ const { Paddle, Environment } = require("@paddle/paddle-node-sdk");
 // Validate required environment variables (but don't crash the app)
 const requiredEnvVars = [
   "PADDLE_API_KEY",
-  "PADDLE_STARTER_PRICE_ID",
+  "PADDLE_CLIENT_TOKEN",
   "PADDLE_PRO_PRICE_ID",
   "PADDLE_LIFETIME_PRICE_ID",
   "CLIENT_URL",
@@ -55,22 +55,16 @@ if (process.env.PADDLE_API_KEY) {
 
 // Product/Price mapping
 const PRODUCTS = {
-  starter: {
-    priceId: process.env.PADDLE_STARTER_PRICE_ID,
-    name: "Starter Plan",
-    price: 9.0,
-    currency: "USD",
-  },
   pro: {
     priceId: process.env.PADDLE_PRO_PRICE_ID,
     name: "Pro Plan",
-    price: 19.0,
+    price: 9.0,
     currency: "USD",
   },
   lifetime: {
     priceId: process.env.PADDLE_LIFETIME_PRICE_ID,
     name: "Lifetime Plan",
-    price: 59.0,
+    price: 49.0,
     currency: "USD",
   },
 };

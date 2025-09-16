@@ -11,7 +11,7 @@ const {
 // Validate required environment variables (but don't crash the app)
 const requiredEnvVars = [
   "PADDLE_API_KEY",
-  "PADDLE_STARTER_PRICE_ID",
+  "PADDLE_CLIENT_TOKEN",
   "PADDLE_PRO_PRICE_ID",
   "PADDLE_LIFETIME_PRICE_ID",
   "CLIENT_URL",
@@ -63,22 +63,16 @@ if (process.env.PADDLE_API_KEY) {
 
 // Product/Price mapping
 const PRODUCTS = {
-  starter: {
-    priceId: process.env.PADDLE_STARTER_PRICE_ID,
-    name: "Starter Plan",
-    price: 9.0,
-    currency: "USD",
-  },
   pro: {
     priceId: process.env.PADDLE_PRO_PRICE_ID,
     name: "Pro Plan",
-    price: 19.0,
+    price: 9.0,
     currency: "USD",
   },
   lifetime: {
     priceId: process.env.PADDLE_LIFETIME_PRICE_ID,
     name: "Lifetime Plan",
-    price: 59.0,
+    price: 49.0,
     currency: "USD",
   },
 };
@@ -451,9 +445,7 @@ const handleSubscriptionActivated = async (data) => {
     // Determine plan type from subscription data - fix data structure access
     let productType = "pro"; // Default to pro for now
     const priceId = data.items?.[0]?.price?.id;
-    if (priceId === process.env.PADDLE_STARTER_PRICE_ID) {
-      productType = "starter";
-    } else if (priceId === process.env.PADDLE_PRO_PRICE_ID) {
+    if (priceId === process.env.PADDLE_PRO_PRICE_ID) {
       productType = "pro";
     } else if (priceId === process.env.PADDLE_LIFETIME_PRICE_ID) {
       productType = "lifetime";
@@ -461,7 +453,6 @@ const handleSubscriptionActivated = async (data) => {
 
     // Update user subscription status with plan limits
     const planLimits = {
-      starter: { links: 10, customDomains: 1 },
       pro: { links: 500, customDomains: 3 },
       lifetime: { links: 9999, customDomains: 10 },
     };
@@ -654,7 +645,6 @@ const getSubscriptionStatus = async (req, res) => {
     // Define correct plan limits
     const planLimits = {
       free: { links: 5, customDomains: 1 },
-      starter: { links: 10, customDomains: 1 },
       pro: { links: 500, customDomains: 3 },
       lifetime: { links: 9999, customDomains: 10 },
     };
