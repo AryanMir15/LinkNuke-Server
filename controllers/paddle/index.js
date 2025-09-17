@@ -6,6 +6,8 @@ const subscriptionController = require("./subscriptionController");
 const refundController = require("./refundController");
 const checkoutController = require("./checkoutController");
 const { paddle, PRODUCTS } = require("./config");
+// Import root paddle controller for handlers defined at the top level
+const paddleRootController = require("../paddleController");
 
 // Export all controllers and utilities
 module.exports = {
@@ -25,6 +27,9 @@ module.exports = {
   createCheckoutSession: checkoutController.createCheckoutSession,
   getClientToken: checkoutController.getClientToken,
   startTrial: checkoutController.startTrial,
+
+  // Manual utilities (testing/admin)
+  manualUpgrade: paddleRootController.manualUpgrade,
 
   // Configuration exports (for backward compatibility)
   paddle,
