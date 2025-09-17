@@ -10,6 +10,7 @@ const {
   getClientToken,
   requestRefund,
   getRefundPolicyInfo,
+  manualUpgrade,
 } = require("../controllers/paddle");
 const authMiddleware = require("../middleware/auth");
 
@@ -35,5 +36,6 @@ router.post("/cancel-subscription", authMiddleware, cancelSubscription);
 router.put("/update-subscription", authMiddleware, updateSubscription);
 router.post("/request-refund", authMiddleware, requestRefund);
 router.get("/refund-policy", authMiddleware, getRefundPolicyInfo);
+router.post("/manual-upgrade", authMiddleware, manualUpgrade);
 
 module.exports = router;

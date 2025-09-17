@@ -406,6 +406,19 @@ const handleSubscriptionActivated = async (data) => {
           console.log(`✅ Found user by customer ID: ${userId}`);
         } else {
           console.log(`ℹ️ No user found for customer ID: ${customerId}`);
+
+          // Try to find user by email from transaction data
+          if (data.customer && data.customer.email) {
+            const customerEmail = data.customer.email;
+            console.log(`🔍 Trying to find user by email: ${customerEmail}`);
+            const userByEmail = await User.findOne({ email: customerEmail });
+            if (userByEmail) {
+              userId = userByEmail._id.toString();
+              console.log(`✅ Found user by email: ${userId}`);
+            } else {
+              console.log(`❌ No user found for email: ${customerEmail}`);
+            }
+          }
         }
       } catch (error) {
         console.error(
@@ -1134,6 +1147,58 @@ const getRefundPolicyInfo = async (req, res) => {
   }
 };
 
+// Manual upgrade function for testing
+const manualUpgrade = async (req, res) => {
+  try {
+    const { userId, plan } = req.body;
+
+    if (!userId || !plan) {
+      return res.status(400).json({ error: "userId and plan are required" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Update user subscription
+    const planLimits = {
+      pro: { links: 500, customDomains: 3 },
+      lifetime: { links: 9999, customDomains: 10 },
+    };
+
+    user.subscription = {
+      status: "active",
+      plan: plan,
+      startDate: new Date(),
+      endDate:
+        plan === "lifetime"
+          ? null
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days for pro
+      usageLimits: planLimits[plan] || planLimits.pro,
+      isTrial: false,
+      trialDays: 0,
+    };
+
+    await user.save();
+
+    console.log(`✅ Manually upgraded user ${user.email} to ${plan} plan`);
+
+    res.json({
+      success: true,
+      message: `User upgraded to ${plan} plan successfully`,
+      user: {
+        email: user.email,
+        plan: user.subscription.plan,
+        status: user.subscription.status,
+      },
+    });
+  } catch (error) {
+    console.error("Manual upgrade error:", error);
+    res.status(500).json({ error: "Failed to upgrade user" });
+  }
+};
+
 module.exports = {
   createCheckoutSession,
   handleWebhook,
@@ -1144,4 +1209,5 @@ module.exports = {
   getClientToken,
   requestRefund,
   getRefundPolicyInfo,
+  manualUpgrade,
 };
