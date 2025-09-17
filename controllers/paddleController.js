@@ -394,37 +394,24 @@ const handleSubscriptionActivated = async (data) => {
 
     let userId = customData.userId;
 
-    // If no userId from customData, try to get customer email from Paddle API
+    // If no userId from customData, try to find user by customer ID directly
     if (!userId && customerId) {
       try {
-        console.log(
-          `🔍 Fetching customer details from Paddle API: ${customerId}`
-        );
-        const customer = await paddle.customers.get(customerId);
-        const customerEmail = customer.email;
-
-        if (customerEmail) {
-          console.log(`📧 Found customer email: ${customerEmail}`);
-          const userByEmail = await User.findOne({ email: customerEmail });
-          if (userByEmail) {
-            userId = userByEmail._id.toString();
-            console.log(`✅ Found user by email: ${userId}`);
-          }
+        console.log(`🔍 Looking up user by customer ID: ${customerId}`);
+        const userByCustomerId = await User.findOne({
+          "subscription.customerId": customerId,
+        });
+        if (userByCustomerId) {
+          userId = userByCustomerId._id.toString();
+          console.log(`✅ Found user by customer ID: ${userId}`);
+        } else {
+          console.log(`ℹ️ No user found for customer ID: ${customerId}`);
         }
       } catch (error) {
-        console.error(`❌ Error fetching customer from Paddle:`, error.message);
-      }
-    }
-
-    // If still no userId, try to find user by customer ID (fallback)
-    if (!userId && customerId) {
-      console.log(`🔍 Looking up user by customer ID: ${customerId}`);
-      const userByCustomerId = await User.findOne({
-        "subscription.customerId": customerId,
-      });
-      if (userByCustomerId) {
-        userId = userByCustomerId._id.toString();
-        console.log(`✅ Found user by customer ID: ${userId}`);
+        console.error(
+          `❌ Error looking up user by customer ID:`,
+          error.message
+        );
       }
     }
 

@@ -153,29 +153,25 @@ const handleTransactionCompleted = async (data) => {
     // Only update transaction ID if we can find the user, but don't activate subscription
     if (customerId) {
       try {
-        console.log(
-          `🔍 Fetching customer details from Paddle API: ${customerId}`
-        );
-        const customer = await paddle.customers.get(customerId);
-        const customerEmail = customer.email;
+        console.log(`🔍 Looking up user by customer ID: ${customerId}`);
+        const userByCustomerId = await User.findOne({
+          "subscription.customerId": customerId,
+        });
 
-        if (customerEmail) {
-          console.log(`📧 Found customer email: ${customerEmail}`);
-          const userByEmail = await User.findOne({ email: customerEmail });
-
-          if (userByEmail) {
-            console.log(`👤 Found user by email: ${userByEmail.email}`);
-            // Only update transaction ID, don't activate subscription yet
-            if (!userByEmail.subscription.transactionId) {
-              userByEmail.subscription.transactionId = transactionId;
-              await userByEmail.save();
-              console.log(
-                `✅ Updated transaction ID for user: ${userByEmail.email}`
-              );
-            }
-          } else {
-            console.log(`❌ No user found with email: ${customerEmail}`);
+        if (userByCustomerId) {
+          console.log(
+            `👤 Found user by customer ID: ${userByCustomerId.email}`
+          );
+          // Only update transaction ID, don't activate subscription yet
+          if (!userByCustomerId.subscription.transactionId) {
+            userByCustomerId.subscription.transactionId = transactionId;
+            await userByCustomerId.save();
+            console.log(
+              `✅ Updated transaction ID for user: ${userByCustomerId.email}`
+            );
           }
+        } else {
+          console.log(`ℹ️ No user found for customer ID: ${customerId}`);
         }
       } catch (error) {
         console.error("Error fetching customer details:", error.message);
