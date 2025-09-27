@@ -1,6 +1,6 @@
 const nodemailer = require("nodemailer");
 
-const transporter = nodemailer.createTransport({
+const transporter = nodemailer.createTransporter({
   service: "gmail",
   auth: {
     user: process.env.EMAIL_USER,
@@ -17,7 +17,7 @@ const sendResetEmail = async ({ email, token }) => {
 
   await transporter.sendMail(
     {
-      from: `"LinkNuke" <${process.env.EMAIL_USER}>`,
+      from: `"LinkNuke" <support@whynotship.me>`,
       to: email,
       subject: "Reset Your Password - LinkNuke",
       html: `
@@ -32,7 +32,7 @@ const sendResetEmail = async ({ email, token }) => {
             Reset Password
           </a>
           <p style="font-size: 14px; color: #64748b; margin-top: 30px;">
-            If you didn’t request this password reset, you can safely ignore this email. This link will expire in 15 minutes.
+            If you didn't request this password reset, you can safely ignore this email. This link will expire in 15 minutes.
           </p>
         </div>
       `,

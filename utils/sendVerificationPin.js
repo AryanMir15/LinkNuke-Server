@@ -1,6 +1,6 @@
 const nodemailer = require("nodemailer");
 
-const transporter = nodemailer.createTransport({
+const transporter = nodemailer.createTransporter({
   service: "gmail",
   auth: {
     user: process.env.EMAIL_USER,
@@ -13,7 +13,7 @@ const sendVerificationPin = async ({ email, pin }) => {
 
   await transporter.sendMail(
     {
-      from: `"LinkNuke" <${process.env.EMAIL_USER}>`,
+      from: `"LinkNuke" <support@whynotship.me>`,
       to: email,
       subject: "Verify Your Email - LinkNuke",
       html: `
@@ -26,7 +26,7 @@ const sendVerificationPin = async ({ email, pin }) => {
             ${pin}
           </div>
           <p style="font-size: 14px; color: #64748b;">
-            This code will expire in 10 minutes. If you didn’t request this, you can safely ignore this email.
+            This code will expire in 10 minutes. If you didn't request this, you can safely ignore this email.
           </p>
         </div>
       `,
