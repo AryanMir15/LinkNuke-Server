@@ -8,7 +8,7 @@ const handleWebhook = async (req, res) => {
     console.log("🔍 Request method:", req.method);
     console.log("🔍 Request URL:", req.url);
     console.log("🔍 Request headers:", JSON.stringify(req.headers, null, 2));
-    
+
     if (!paddle) {
       console.error("Paddle client not initialized for webhook");
       return res.status(503).json({ error: "Payment service unavailable" });
@@ -17,7 +17,10 @@ const handleWebhook = async (req, res) => {
     const signature = req.headers["paddle-signature"];
     console.log("🔍 Received signature:", signature);
     console.log("🔍 Signature type:", typeof signature);
-    console.log("🔍 Signature length:", signature ? signature.length : "undefined");
+    console.log(
+      "🔍 Signature length:",
+      signature ? signature.length : "undefined"
+    );
 
     if (!signature) {
       console.error("Missing webhook signature");
@@ -25,55 +28,110 @@ const handleWebhook = async (req, res) => {
     }
 
     // Debug environment variables
-    console.log("🔍 PADDLE_WEBHOOK_SECRET exists:", !!process.env.PADDLE_WEBHOOK_SECRET);
-    console.log("🔍 PADDLE_WEBHOOK_SECRET length:", process.env.PADDLE_WEBHOOK_SECRET ? process.env.PADDLE_WEBHOOK_SECRET.length : "undefined");
-    console.log("🔍 PADDLE_WEBHOOK_SECRET starts with:", process.env.PADDLE_WEBHOOK_SECRET ? process.env.PADDLE_WEBHOOK_SECRET.substring(0, 10) + "..." : "undefined");
-    console.log("🔍 PADDLE_WEBHOOK_SECRET ends with:", process.env.PADDLE_WEBHOOK_SECRET ? "..." + process.env.PADDLE_WEBHOOK_SECRET.substring(process.env.PADDLE_WEBHOOK_SECRET.length - 10) : "undefined");
+    console.log(
+      "🔍 PADDLE_WEBHOOK_SECRET exists:",
+      !!process.env.PADDLE_WEBHOOK_SECRET
+    );
+    console.log(
+      "🔍 PADDLE_WEBHOOK_SECRET length:",
+      process.env.PADDLE_WEBHOOK_SECRET
+        ? process.env.PADDLE_WEBHOOK_SECRET.length
+        : "undefined"
+    );
+    console.log(
+      "🔍 PADDLE_WEBHOOK_SECRET starts with:",
+      process.env.PADDLE_WEBHOOK_SECRET
+        ? process.env.PADDLE_WEBHOOK_SECRET.substring(0, 10) + "..."
+        : "undefined"
+    );
+    console.log(
+      "🔍 PADDLE_WEBHOOK_SECRET ends with:",
+      process.env.PADDLE_WEBHOOK_SECRET
+        ? "..." +
+            process.env.PADDLE_WEBHOOK_SECRET.substring(
+              process.env.PADDLE_WEBHOOK_SECRET.length - 10
+            )
+        : "undefined"
+    );
 
     // Debug request body
     console.log("🔍 Request body type:", typeof req.body);
     console.log("🔍 Request body is Buffer:", Buffer.isBuffer(req.body));
-    console.log("🔍 Request body length:", req.body ? req.body.length : "undefined");
-    console.log("🔍 Request body first 100 chars:", req.body ? req.body.toString().substring(0, 100) : "undefined");
-    console.log("🔍 Request body last 100 chars:", req.body ? req.body.toString().substring(Math.max(0, req.body.length - 100)) : "undefined");
+    console.log(
+      "🔍 Request body length:",
+      req.body ? req.body.length : "undefined"
+    );
+    console.log(
+      "🔍 Request body first 100 chars:",
+      req.body ? req.body.toString().substring(0, 100) : "undefined"
+    );
+    console.log(
+      "🔍 Request body last 100 chars:",
+      req.body
+        ? req.body.toString().substring(Math.max(0, req.body.length - 100))
+        : "undefined"
+    );
 
     // Convert raw body to string for verification
     const rawBody = Buffer.isBuffer(req.body)
       ? req.body.toString("utf8")
       : JSON.stringify(req.body);
-    
+
     console.log("🔍 Raw body type:", typeof rawBody);
     console.log("🔍 Raw body length:", rawBody.length);
     console.log("🔍 Raw body first 200 chars:", rawBody.substring(0, 200));
-    console.log("🔍 Raw body last 200 chars:", rawBody.substring(Math.max(0, rawBody.length - 200));
+    console.log(
+      "🔍 Raw body last 200 chars:",
+      rawBody.substring(Math.max(0, rawBody.length - 200))
+    );
 
     // Debug signature format
     console.log("🔍 Signature format analysis:");
-    console.log("🔍 - Contains 'pdl_':", signature.includes('pdl_'));
-    console.log("🔍 - Contains 'ntfset_':", signature.includes('ntfset_'));
-    console.log("🔍 - Contains 'webhook_':", signature.includes('webhook_'));
-    console.log("🔍 - Contains 'sig_':", signature.includes('sig_'));
-    console.log("🔍 - Contains '=':", signature.includes('='));
-    console.log("🔍 - Contains ':':", signature.includes(':'));
-    console.log("🔍 - Contains ',':", signature.includes(','));
-    console.log("🔍 - Contains ';':", signature.includes(';'));
+    console.log("🔍 - Contains 'pdl_':", signature.includes("pdl_"));
+    console.log("🔍 - Contains 'ntfset_':", signature.includes("ntfset_"));
+    console.log("🔍 - Contains 'webhook_':", signature.includes("webhook_"));
+    console.log("🔍 - Contains 'sig_':", signature.includes("sig_"));
+    console.log("🔍 - Contains '=':", signature.includes("="));
+    console.log("🔍 - Contains ':':", signature.includes(":"));
+    console.log("🔍 - Contains ',':", signature.includes(","));
+    console.log("🔍 - Contains ';':", signature.includes(";"));
 
     // Debug webhook secret format
     console.log("🔍 Webhook secret format analysis:");
-    console.log("🔍 - Contains 'pdl_':", process.env.PADDLE_WEBHOOK_SECRET ? process.env.PADDLE_WEBHOOK_SECRET.includes('pdl_') : false);
-    console.log("🔍 - Contains 'ntfset_':", process.env.PADDLE_WEBHOOK_SECRET ? process.env.PADDLE_WEBHOOK_SECRET.includes('ntfset_') : false);
-    console.log("🔍 - Contains 'webhook_':", process.env.PADDLE_WEBHOOK_SECRET ? process.env.PADDLE_WEBHOOK_SECRET.includes('webhook_') : false);
-    console.log("🔍 - Contains 'sig_':", process.env.PADDLE_WEBHOOK_SECRET ? process.env.PADDLE_WEBHOOK_SECRET.includes('sig_') : false);
+    console.log(
+      "🔍 - Contains 'pdl_':",
+      process.env.PADDLE_WEBHOOK_SECRET
+        ? process.env.PADDLE_WEBHOOK_SECRET.includes("pdl_")
+        : false
+    );
+    console.log(
+      "🔍 - Contains 'ntfset_':",
+      process.env.PADDLE_WEBHOOK_SECRET
+        ? process.env.PADDLE_WEBHOOK_SECRET.includes("ntfset_")
+        : false
+    );
+    console.log(
+      "🔍 - Contains 'webhook_':",
+      process.env.PADDLE_WEBHOOK_SECRET
+        ? process.env.PADDLE_WEBHOOK_SECRET.includes("webhook_")
+        : false
+    );
+    console.log(
+      "🔍 - Contains 'sig_':",
+      process.env.PADDLE_WEBHOOK_SECRET
+        ? process.env.PADDLE_WEBHOOK_SECRET.includes("sig_")
+        : false
+    );
 
     console.log("🔍 === ATTEMPTING SIGNATURE VERIFICATION ===");
-    
+
     // Verify webhook signature
     const event = await paddle.webhooks.unmarshal(
       rawBody,
       process.env.PADDLE_WEBHOOK_SECRET,
       signature
     );
-    
+
     console.log("🔍 === SIGNATURE VERIFICATION SUCCESS ===");
     console.log("🔍 Event type:", event.eventType);
     console.log("🔍 Event data keys:", Object.keys(event.data || {}));
@@ -168,7 +226,7 @@ const handleWebhook = async (req, res) => {
     console.error("🔍 Error name:", error.name);
     console.error("🔍 Error code:", error.code);
     console.error("🔍 Error stack:", error.stack);
-    
+
     // Additional debugging for signature verification errors
     if (
       error.message.includes("signature") ||
@@ -178,25 +236,49 @@ const handleWebhook = async (req, res) => {
       console.error("🔍 Error details:", {
         message: error.message,
         name: error.name,
-        code: error.code
+        code: error.code,
       });
-      
+
       // Log the exact values being compared
-      console.error("🔍 Signature being verified:", req.headers["paddle-signature"]);
-      console.error("🔍 Webhook secret being used:", process.env.PADDLE_WEBHOOK_SECRET);
-      console.error("🔍 Raw body being verified:", req.body ? req.body.toString().substring(0, 500) + "..." : "undefined");
-      
+      console.error(
+        "🔍 Signature being verified:",
+        req.headers["paddle-signature"]
+      );
+      console.error(
+        "🔍 Webhook secret being used:",
+        process.env.PADDLE_WEBHOOK_SECRET
+      );
+      console.error(
+        "🔍 Raw body being verified:",
+        req.body ? req.body.toString().substring(0, 500) + "..." : "undefined"
+      );
+
       // Check if it's a format issue
       const signature = req.headers["paddle-signature"];
       const secret = process.env.PADDLE_WEBHOOK_SECRET;
-      
+
       console.error("🔍 Format comparison:");
-      console.error("🔍 - Signature starts with 'pdl_':", signature ? signature.startsWith('pdl_') : false);
-      console.error("🔍 - Secret starts with 'pdl_':", secret ? secret.startsWith('pdl_') : false);
-      console.error("🔍 - Signature length:", signature ? signature.length : "undefined");
-      console.error("🔍 - Secret length:", secret ? secret.length : "undefined");
-      console.error("🔍 - Signature and secret match exactly:", signature === secret);
-      
+      console.error(
+        "🔍 - Signature starts with 'pdl_':",
+        signature ? signature.startsWith("pdl_") : false
+      );
+      console.error(
+        "🔍 - Secret starts with 'pdl_':",
+        secret ? secret.startsWith("pdl_") : false
+      );
+      console.error(
+        "🔍 - Signature length:",
+        signature ? signature.length : "undefined"
+      );
+      console.error(
+        "🔍 - Secret length:",
+        secret ? secret.length : "undefined"
+      );
+      console.error(
+        "🔍 - Signature and secret match exactly:",
+        signature === secret
+      );
+
       return res
         .status(400)
         .json({ error: "Webhook signature verification failed" });
