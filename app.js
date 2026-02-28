@@ -4,6 +4,8 @@ const express = require("express");
 const app = express();
 const rateLimit = require("express-rate-limit");
 
+// Hard resetting Vike setup
+
 // ========== External Packages ==========
 const session = require("express-session");
 const MongoStore = require("connect-mongo");
@@ -88,7 +90,7 @@ app.use(
       httpOnly: true,
       maxAge: 1000 * 60 * 60 * 24,
     },
-  })
+  }),
 );
 app.use(passport.initialize());
 app.use(passport.session());
@@ -115,13 +117,13 @@ app.use((req, res, next) => {
     // Add more detailed logging for tracking requests
     if (req.originalUrl.includes("/track/")) {
       process.stdout.write(
-        `🔍 APP: TRACKING REQUEST: ${req.method} ${req.originalUrl}\n`
+        `🔍 APP: TRACKING REQUEST: ${req.method} ${req.originalUrl}\n`,
       );
       process.stdout.write(
-        `🔍 APP: Request body: ${JSON.stringify(req.body)}\n`
+        `🔍 APP: Request body: ${JSON.stringify(req.body)}\n`,
       );
       process.stdout.write(
-        `🔍 APP: Request params: ${JSON.stringify(req.params)}\n`
+        `🔍 APP: Request params: ${JSON.stringify(req.params)}\n`,
       );
     }
   }
