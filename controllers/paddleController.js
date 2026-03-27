@@ -641,20 +641,6 @@ const getSubscriptionStatus = async (req, res) => {
   try {
     const user = req.user;
 
-    console.log(
-      "🔍 [BACKEND] getSubscriptionStatus called for user:",
-      user.email,
-    );
-    console.log("🔍 [BACKEND] User ID:", user._id);
-    console.log(
-      "🔍 [BACKEND] Current subscription from DB:",
-      JSON.stringify(user.subscription, null, 2),
-    );
-    console.log(
-      "🔍 [BACKEND] Current usage from DB:",
-      JSON.stringify(user.usage, null, 2),
-    );
-
     // Define correct plan limits
     const planLimits = {
       free: { links: 5, customDomains: 1 },
@@ -662,59 +648,32 @@ const getSubscriptionStatus = async (req, res) => {
       lifetime: { links: 9999, customDomains: 10 },
     };
 
-    console.log("🔍 [BACKEND] Plan limits:", planLimits);
-
     // Ensure user has subscription and usage data
     if (!user.subscription) {
-      console.log(
-        "🔍 [BACKEND] No subscription found, creating default free subscription",
-      );
       user.subscription = {
         status: "active",
         plan: "free",
         usageLimits: planLimits.free,
       };
       await user.save();
-      console.log(
-        "🔍 [BACKEND] Created default subscription:",
-        JSON.stringify(user.subscription, null, 2),
-      );
     } else {
       // Ensure usageLimits are correct for the current plan
       const currentPlan = user.subscription.plan || "free";
-      console.log("🔍 [BACKEND] Current plan detected:", currentPlan);
-
       if (
         !user.subscription.usageLimits ||
         user.subscription.usageLimits.links !== planLimits[currentPlan].links
       ) {
-        console.log(
-          "🔍 [BACKEND] Updating usage limits for plan:",
-          currentPlan,
-        );
-        console.log("🔍 [BACKEND] Old limits:", user.subscription.usageLimits);
-        console.log("🔍 [BACKEND] New limits:", planLimits[currentPlan]);
-
         user.subscription.usageLimits = planLimits[currentPlan];
         await user.save();
-        console.log(
-          "🔍 [BACKEND] Updated subscription:",
-          JSON.stringify(user.subscription, null, 2),
-        );
       }
     }
 
     if (!user.usage) {
-      console.log("🔍 [BACKEND] No usage data found, creating default");
       user.usage = {
         linksCreated: 0,
         storageUsed: 0,
       };
       await user.save();
-      console.log(
-        "🔍 [BACKEND] Created default usage:",
-        JSON.stringify(user.usage, null, 2),
-      );
     }
 
     // Calculate usage percentage
@@ -732,8 +691,6 @@ const getSubscriptionStatus = async (req, res) => {
         }
       : null;
 
-    console.log("🔍 [BACKEND] Calculated usage:", usage);
-
     // Extract billing period dates
     const billingPeriod =
       user.subscription.endDate && user.subscription.startDate
@@ -750,26 +707,15 @@ const getSubscriptionStatus = async (req, res) => {
           }
         : null;
 
-    console.log("🔍 [BACKEND] Billing period:", billingPeriod);
-
-    const responseData = {
+    res.json({
       hasSubscription: true,
       subscription: user.subscription,
       usage,
       billing_period: billingPeriod,
       proration: user.subscription.prorationData || null,
-    };
-
-    console.log(
-      "🔍 [BACKEND] FINAL RESPONSE being sent to frontend:",
-      JSON.stringify(responseData, null, 2),
-    );
-    console.log("🔍 [BACKEND] Plan being sent:", user.subscription.plan);
-    console.log("🔍 [BACKEND] Status being sent:", user.subscription.status);
-
-    res.json(responseData);
+    });
   } catch (error) {
-    console.error("❌ [BACKEND] Error getting subscription status:", error);
+    console.error("Error getting subscription status:", error);
     res.status(500).json({ error: "Failed to get subscription status" });
   }
 };
