@@ -17,12 +17,12 @@ const requiredEnvVars = [
 ];
 
 const missingEnvVars = requiredEnvVars.filter(
-  (varName) => !process.env[varName]
+  (varName) => !process.env[varName],
 );
 if (missingEnvVars.length > 0) {
   console.warn("Missing Paddle environment variables:", missingEnvVars);
   console.warn(
-    "Paddle checkout functionality will not work until these are configured."
+    "Paddle checkout functionality will not work until these are configured.",
   );
 }
 
@@ -37,11 +37,11 @@ if (process.env.PADDLE_API_KEY) {
 
     console.log(
       "Initializing Paddle with environment:",
-      process.env.PADDLE_ENV || "production"
+      process.env.PADDLE_ENV || "production",
     );
     console.log(
       "API Key prefix:",
-      process.env.PADDLE_API_KEY.substring(0, 10) + "..."
+      process.env.PADDLE_API_KEY.substring(0, 10) + "...",
     );
 
     paddle = new Paddle(process.env.PADDLE_API_KEY, {
@@ -51,7 +51,7 @@ if (process.env.PADDLE_API_KEY) {
     console.log("Paddle initialized successfully");
     console.log(
       "Environment:",
-      environment === Environment.sandbox ? "sandbox" : "production"
+      environment === Environment.sandbox ? "sandbox" : "production",
     );
   } catch (error) {
     console.error("Failed to initialize Paddle client:", error);
@@ -143,11 +143,11 @@ const createCheckoutSession = async (req, res) => {
     // Set redirect URLs
     hostedCheckoutUrl.searchParams.set(
       "success_url",
-      `${process.env.CLIENT_URL}/dashboard?payment=success&userId=${user._id}&productType=${productType}`
+      `${process.env.CLIENT_URL}/dashboard?payment=success&userId=${user._id}&productType=${productType}`,
     );
     hostedCheckoutUrl.searchParams.set(
       "cancel_url",
-      `${process.env.CLIENT_URL}/pricing?payment=cancelled`
+      `${process.env.CLIENT_URL}/pricing?payment=cancelled`,
     );
 
     // Optional: Add these for better UX
@@ -201,7 +201,7 @@ const handleWebhook = async (req, res) => {
     const event = await paddle.webhooks.unmarshal(
       rawBody,
       process.env.PADDLE_WEBHOOK_SECRET,
-      signature
+      signature,
     );
 
     console.log(`📨 Webhook: ${event.eventType}`);
@@ -322,7 +322,7 @@ const handleTransactionCompleted = async (data) => {
     const status = data.status;
 
     console.log(
-      `✅ Transaction ${transactionId} completed with status: ${status}`
+      `✅ Transaction ${transactionId} completed with status: ${status}`,
     );
     console.log(`🆔 Customer ID: ${customerId}`);
 
@@ -343,7 +343,7 @@ const handleTransactionCompleted = async (data) => {
           }
         } else {
           console.log(
-            `ℹ️ No user found for customer ID: ${customerId} - subscription activation will be handled by subscription.activated webhook`
+            `ℹ️ No user found for customer ID: ${customerId} - subscription activation will be handled by subscription.activated webhook`,
           );
         }
       } catch (error) {
@@ -423,7 +423,7 @@ const handleSubscriptionActivated = async (data) => {
       } catch (error) {
         console.error(
           `❌ Error looking up user by customer ID:`,
-          error.message
+          error.message,
         );
       }
     }
@@ -467,7 +467,7 @@ const handleSubscriptionActivated = async (data) => {
           ? null
           : new Date(
               data.nextBilledAt || // Fix: use nextBilledAt not next_billed_at
-                new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+                new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
             ),
       usageLimits: planLimits[productType],
       isTrial: false,
@@ -488,7 +488,7 @@ const handleSubscriptionActivated = async (data) => {
 
     await user.save();
     console.log(
-      `🎉 User ${user.email} subscription activated for ${productType} plan!`
+      `🎉 User ${user.email} subscription activated for ${productType} plan!`,
     );
   } catch (error) {
     console.error("Error handling subscription activated:", error);
@@ -516,7 +516,7 @@ const handleSubscriptionCancelled = async (data) => {
       user.subscription.endDate = new Date(
         data.scheduledChange?.action == "cancel"
           ? data.scheduledChange.effectiveFrom
-          : new Date()
+          : new Date(),
       );
       await user.save();
     }
@@ -600,7 +600,7 @@ const handleTransactionRefunded = async (data) => {
 
         await user.save();
         console.log(
-          `✅ User ${user.email} downgraded to free plan after refund`
+          `✅ User ${user.email} downgraded to free plan after refund`,
         );
       }
     }
@@ -641,6 +641,20 @@ const getSubscriptionStatus = async (req, res) => {
   try {
     const user = req.user;
 
+    console.log(
+      "🔍 [BACKEND] getSubscriptionStatus called for user:",
+      user.email,
+    );
+    console.log("🔍 [BACKEND] User ID:", user._id);
+    console.log(
+      "🔍 [BACKEND] Current subscription from DB:",
+      JSON.stringify(user.subscription, null, 2),
+    );
+    console.log(
+      "🔍 [BACKEND] Current usage from DB:",
+      JSON.stringify(user.usage, null, 2),
+    );
+
     // Define correct plan limits
     const planLimits = {
       free: { links: 5, customDomains: 1 },
@@ -648,32 +662,59 @@ const getSubscriptionStatus = async (req, res) => {
       lifetime: { links: 9999, customDomains: 10 },
     };
 
+    console.log("🔍 [BACKEND] Plan limits:", planLimits);
+
     // Ensure user has subscription and usage data
     if (!user.subscription) {
+      console.log(
+        "🔍 [BACKEND] No subscription found, creating default free subscription",
+      );
       user.subscription = {
         status: "active",
         plan: "free",
         usageLimits: planLimits.free,
       };
       await user.save();
+      console.log(
+        "🔍 [BACKEND] Created default subscription:",
+        JSON.stringify(user.subscription, null, 2),
+      );
     } else {
       // Ensure usageLimits are correct for the current plan
       const currentPlan = user.subscription.plan || "free";
+      console.log("🔍 [BACKEND] Current plan detected:", currentPlan);
+
       if (
         !user.subscription.usageLimits ||
         user.subscription.usageLimits.links !== planLimits[currentPlan].links
       ) {
+        console.log(
+          "🔍 [BACKEND] Updating usage limits for plan:",
+          currentPlan,
+        );
+        console.log("🔍 [BACKEND] Old limits:", user.subscription.usageLimits);
+        console.log("🔍 [BACKEND] New limits:", planLimits[currentPlan]);
+
         user.subscription.usageLimits = planLimits[currentPlan];
         await user.save();
+        console.log(
+          "🔍 [BACKEND] Updated subscription:",
+          JSON.stringify(user.subscription, null, 2),
+        );
       }
     }
 
     if (!user.usage) {
+      console.log("🔍 [BACKEND] No usage data found, creating default");
       user.usage = {
         linksCreated: 0,
         storageUsed: 0,
       };
       await user.save();
+      console.log(
+        "🔍 [BACKEND] Created default usage:",
+        JSON.stringify(user.usage, null, 2),
+      );
     }
 
     // Calculate usage percentage
@@ -685,11 +726,13 @@ const getSubscriptionStatus = async (req, res) => {
             percent: Math.round(
               ((user.usage.linksCreated || 0) /
                 user.subscription.usageLimits.links) *
-                100
+                100,
             ),
           },
         }
       : null;
+
+    console.log("🔍 [BACKEND] Calculated usage:", usage);
 
     // Extract billing period dates
     const billingPeriod =
@@ -701,21 +744,32 @@ const getSubscriptionStatus = async (req, res) => {
               0,
               Math.ceil(
                 (new Date(user.subscription.endDate) - Date.now()) /
-                  (1000 * 60 * 60 * 24)
-              )
+                  (1000 * 60 * 60 * 24),
+              ),
             ),
           }
         : null;
 
-    res.json({
+    console.log("🔍 [BACKEND] Billing period:", billingPeriod);
+
+    const responseData = {
       hasSubscription: true,
       subscription: user.subscription,
       usage,
       billing_period: billingPeriod,
       proration: user.subscription.prorationData || null,
-    });
+    };
+
+    console.log(
+      "🔍 [BACKEND] FINAL RESPONSE being sent to frontend:",
+      JSON.stringify(responseData, null, 2),
+    );
+    console.log("🔍 [BACKEND] Plan being sent:", user.subscription.plan);
+    console.log("🔍 [BACKEND] Status being sent:", user.subscription.status);
+
+    res.json(responseData);
   } catch (error) {
-    console.error("Error getting subscription status:", error);
+    console.error("❌ [BACKEND] Error getting subscription status:", error);
     res.status(500).json({ error: "Failed to get subscription status" });
   }
 };
@@ -725,7 +779,7 @@ const cancelSubscription = async (req, res) => {
   try {
     if (!paddle) {
       console.error(
-        "Paddle client not initialized for subscription cancellation"
+        "Paddle client not initialized for subscription cancellation",
       );
       return res.status(503).json({ error: "Payment service unavailable" });
     }
@@ -750,13 +804,13 @@ const cancelSubscription = async (req, res) => {
         console.log(
           `🔄 Attempting Paddle API call (attempt ${
             retryCount + 1
-          }/${maxRetries})`
+          }/${maxRetries})`,
         );
 
         // Add timeout to the Paddle client call
         // Paddle SDK v3 - try different parameter formats
         console.log(
-          `🔍 Attempting to cancel subscription with ID: ${user.subscription.subscriptionId}`
+          `🔍 Attempting to cancel subscription with ID: ${user.subscription.subscriptionId}`,
         );
 
         // Try the correct Paddle SDK v3 format
@@ -764,7 +818,7 @@ const cancelSubscription = async (req, res) => {
           user.subscription.subscriptionId,
           {
             effectiveFrom: "next_billing_period",
-          }
+          },
         );
 
         // Create a timeout promise
@@ -780,13 +834,13 @@ const cancelSubscription = async (req, res) => {
         retryCount++;
         console.error(
           `❌ Paddle API call failed (attempt ${retryCount}/${maxRetries}):`,
-          apiError.message
+          apiError.message,
         );
 
         if (retryCount >= maxRetries) {
           // If all retries failed, we'll still update the local database
           console.error(
-            `❌ All ${maxRetries} attempts failed. Proceeding with local cancellation.`
+            `❌ All ${maxRetries} attempts failed. Proceeding with local cancellation.`,
           );
 
           // Check if it's a timeout, connection error, or invalid URL
@@ -798,7 +852,7 @@ const cancelSubscription = async (req, res) => {
             apiError.code === "invalid_url"
           ) {
             console.log(
-              `⚠️ API error detected (${apiError.message}). Cancelling locally and will sync with Paddle later.`
+              `⚠️ API error detected (${apiError.message}). Cancelling locally and will sync with Paddle later.`,
             );
             // We'll proceed with local cancellation and let the webhook handle the sync
             break;
@@ -822,7 +876,7 @@ const cancelSubscription = async (req, res) => {
     if (user.subscription.endDate && user.subscription.endDate > new Date()) {
       // Keep access until end of current billing period
       console.log(
-        `📅 Subscription will remain active until: ${user.subscription.endDate}`
+        `📅 Subscription will remain active until: ${user.subscription.endDate}`,
       );
     } else {
       // Immediate cancellation
@@ -832,7 +886,7 @@ const cancelSubscription = async (req, res) => {
 
     await user.save();
     console.log(
-      `✅ Subscription cancelled successfully for user: ${user.email}`
+      `✅ Subscription cancelled successfully for user: ${user.email}`,
     );
 
     // Determine if this was a local cancellation due to network issues
@@ -922,7 +976,7 @@ const getClientToken = async (req, res) => {
   try {
     if (!paddle) {
       console.error(
-        "Paddle client not initialized for client token generation"
+        "Paddle client not initialized for client token generation",
       );
       return res.status(503).json({ error: "Payment service unavailable" });
     }
@@ -1016,7 +1070,7 @@ const requestRefund = async (req, res) => {
       // Try to get transaction ID from subscription
       try {
         const subscription = await paddle.subscriptions.get(
-          user.subscription.subscriptionId
+          user.subscription.subscriptionId,
         );
         transactionId = subscription.transactions?.[0]?.id;
         if (transactionId) {
