@@ -5,7 +5,7 @@ const verifyToken = async (req, res) => {
   try {
     // User is already verified by auth middleware
     const user = await User.findById(req.user._id).select(
-      "-password -__v -createdAt -updatedAt"
+      "-password -__v -createdAt -updatedAt",
     );
 
     res.json({
@@ -32,7 +32,9 @@ const googleAuthCallback = async (req, res) => {
     }
 
     const token = req.user.createJWT();
-    res.redirect(`/oauth-success?token=${token}&userId=${req.user._id}`);
+    res.redirect(
+      `${process.env.CLIENT_URL}/oauth-success?token=${token}&userId=${req.user._id}`,
+    );
   } catch (error) {
     console.error("Google OAuth error:", error);
     res.redirect("/login?error=oauth_failed");
@@ -61,7 +63,7 @@ const register = async (req, res) => {
     }
 
     const verificationPin = Math.floor(
-      100000 + Math.random() * 900000
+      100000 + Math.random() * 900000,
     ).toString(); // 6-digit
     const pinExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
 

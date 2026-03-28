@@ -9,9 +9,9 @@ router.get(
   passport.authenticate("google", {
     scope: ["profile", "email"],
     state: Buffer.from(
-      JSON.stringify({ redirectTo: process.env.CLIENT_URL || "" })
+      JSON.stringify({ redirectTo: process.env.CLIENT_URL || "" }),
     ).toString("base64"),
-  })
+  }),
 );
 
 router.get(
@@ -30,15 +30,15 @@ router.get(
       res.redirect(
         `${process.env.CLIENT_URL}/oauth-success?token=${token}&redirectTo=${
           state.redirectTo || ""
-        }`
+        }`,
       );
     } catch (err) {
       console.error("Google callback error:", err);
       res.redirect(
-        `${process.env.CLIENT_URL}/login?error=authentication_failed`
+        `${process.env.CLIENT_URL}/login?error=authentication_failed`,
       );
     }
-  }
+  },
 );
 
 // Get current user details
