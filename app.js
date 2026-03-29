@@ -85,15 +85,17 @@ app.use(
       ttl: 24 * 60 * 60, // 24 hours
     }),
     cookie: {
-      secure: true,
-      sameSite: "none",
+      secure: process.env.NODE_ENV === "production",
       httpOnly: true,
-      maxAge: 1000 * 60 * 60 * 24,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      sameSite: "lax",
     },
   }),
 );
+console.log("🔍🔍🔍 [APP] Initializing Passport...");
 app.use(passport.initialize());
 app.use(passport.session());
+console.log("🔍🔍🔍 [APP] Passport initialized successfully");
 
 // Rate limiting middleware
 const limiter = rateLimit({
