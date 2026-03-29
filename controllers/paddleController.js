@@ -83,8 +83,12 @@ const createCheckoutSession = async (req, res) => {
   try {
     const { productType } = req.body;
     const userId = req.user._id;
+    const idempotencyKey = req.headers["idempotency-key"];
 
     console.log(`🛒 Creating ${productType} checkout for ${req.user.email}`);
+    if (idempotencyKey) {
+      console.log(`🔑 Idempotency key: ${idempotencyKey}`);
+    }
 
     // Check if Paddle is initialized
     if (!paddle) {
@@ -120,6 +124,23 @@ const createCheckoutSession = async (req, res) => {
     if (!user.isVerified) {
       return res.status(403).json({
         error: "Email must be verified before purchasing a subscription",
+      });
+    }
+
+    // Check for existing active subscription to prevent double purchases
+    if (
+      user.subscription &&
+      user.subscription.status === "active" &&
+      user.subscription.plan === productType
+    ) {
+      console.log(`⚠️ User already has active ${productType} subscription`);
+      return res.status(409).json({
+        error: "You already have an active subscription for this plan",
+        currentSubscription: {
+          plan: user.subscription.plan,
+          status: user.subscription.status,
+          endDate: user.subscription.endDate,
+        },
       });
     }
 
@@ -206,81 +227,103 @@ const handleWebhook = async (req, res) => {
 
     console.log(`📨 Webhook: ${event.eventType}`);
 
+    // Extract event ID for idempotency
+    const eventId = event.id;
+    const eventType = event.eventType;
+
+    // Check if we've already processed this event
+    if (eventId) {
+      try {
+        const existingUser = await User.findOne({
+          "subscription.lastWebhookEventId": eventId,
+        });
+
+        if (existingUser) {
+          console.log(
+            `⚠️ Webhook event ${eventId} already processed, skipping`,
+          );
+          return res.json({ received: true, duplicate: true });
+        }
+      } catch (error) {
+        console.log("ℹ️ Checking webhook idempotency:", error.message);
+      }
+    }
+
     try {
-      switch (event.eventType) {
+      switch (eventType) {
         case "transaction.created":
           console.log("⏳ Transaction created - waiting for completion");
           break;
 
         case "transaction.completed":
           console.log("✅ Processing transaction.completed...");
-          await handleTransactionCompleted(event.data);
+          await handleTransactionCompleted(event.data, eventId);
           console.log("✅ Transaction completed successfully");
           break;
 
         case "transaction.paid":
           console.log("✅ Processing transaction.paid...");
-          await handleTransactionPaid(event.data);
+          await handleTransactionPaid(event.data, eventId);
           console.log("✅ Transaction paid successfully");
           break;
 
         case "transaction.payment_failed":
           console.log("❌ Processing transaction.payment_failed...");
-          await handleTransactionPaymentFailed(event.data);
+          await handleTransactionPaymentFailed(event.data, eventId);
           console.log("✅ Transaction payment failed handled");
           break;
 
         case "transaction.refunded":
           console.log("🔄 Processing transaction.refunded...");
-          await handleTransactionRefunded(event.data);
+          await handleTransactionRefunded(event.data, eventId);
           console.log("✅ Transaction refunded handled");
           break;
 
         case "subscription.created":
           console.log("✅ Processing subscription.created...");
-          await handleSubscriptionCreated(event.data);
+          await handleSubscriptionCreated(event.data, eventId);
           console.log("✅ Subscription created successfully");
           break;
 
         case "subscription.activated":
           console.log("✅ Processing subscription.activated...");
-          await handleSubscriptionActivated(event.data);
+          await handleSubscriptionActivated(event.data, eventId);
           console.log("✅ Subscription activated successfully");
           break;
 
         case "subscription.updated":
           console.log("🔄 Processing subscription.updated...");
-          await handleSubscriptionUpdated(event.data);
+          await handleSubscriptionUpdated(event.data, eventId);
           console.log("✅ Subscription updated successfully");
           break;
 
         case "subscription.cancelled":
         case "subscription.canceled":
           console.log("❌ Processing subscription.cancelled...");
-          await handleSubscriptionCancelled(event.data);
+          await handleSubscriptionCancelled(event.data, eventId);
           console.log("✅ Subscription cancelled successfully");
           break;
 
         case "subscription.paused":
           console.log("⏸️ Processing subscription.paused...");
-          await handleSubscriptionPaused(event.data);
+          await handleSubscriptionPaused(event.data, eventId);
           console.log("✅ Subscription paused successfully");
           break;
 
         case "subscription.resumed":
           console.log("▶️ Processing subscription.resumed...");
-          await handleSubscriptionResumed(event.data);
+          await handleSubscriptionResumed(event.data, eventId);
           console.log("✅ Subscription resumed successfully");
           break;
 
         case "subscription.past_due":
           console.log("⚠️ Processing subscription.past_due...");
-          await handleSubscriptionPastDue(event.data);
+          await handleSubscriptionPastDue(event.data, eventId);
           console.log("✅ Subscription past due handled");
           break;
 
         default:
-          console.log(`⚠️ Unhandled webhook event: ${event.eventType}`);
+          console.log(`⚠️ Unhandled webhook event: ${eventType}`);
       }
 
       res.json({ received: true });
@@ -308,7 +351,7 @@ const handleWebhook = async (req, res) => {
 };
 
 // Webhook handlers
-const handleTransactionCompleted = async (data) => {
+const handleTransactionCompleted = async (data, eventId = null) => {
   try {
     console.log(`💰 Processing transaction: ${data.id}`);
     console.log(`📊 Transaction data:`, JSON.stringify(data, null, 2));
@@ -338,6 +381,7 @@ const handleTransactionCompleted = async (data) => {
           // Update transaction ID in subscription if it exists
           if (user.subscription) {
             user.subscription.transactionId = transactionId;
+            if (eventId) user.subscription.lastWebhookEventId = eventId; // Store for idempotency
             await user.save();
             console.log(`📝 Updated transaction ID for user: ${user.email}`);
           }
@@ -357,7 +401,7 @@ const handleTransactionCompleted = async (data) => {
   }
 };
 
-const handleSubscriptionCreated = async (data) => {
+const handleSubscriptionCreated = async (data, eventId = null) => {
   try {
     const { customerId, customData } = data;
     const userId = customData?.userId;
@@ -371,6 +415,7 @@ const handleSubscriptionCreated = async (data) => {
           customerId: customerId,
           startDate: new Date(),
           endDate: new Date(data.nextBilledAt),
+          lastWebhookEventId: eventId, // Store for idempotency
         };
         await user.save();
       }
@@ -380,7 +425,7 @@ const handleSubscriptionCreated = async (data) => {
   }
 };
 
-const handleSubscriptionActivated = async (data) => {
+const handleSubscriptionActivated = async (data, eventId = null) => {
   try {
     console.log(`🎯 Processing subscription activation: ${data.id}`);
     console.log(`📊 Subscription data:`, JSON.stringify(data, null, 2));
@@ -391,6 +436,7 @@ const handleSubscriptionActivated = async (data) => {
 
     console.log(`🔍 Custom data:`, customData);
     console.log(`🆔 Customer ID:`, customerId);
+    if (eventId) console.log(`🔑 Event ID: ${eventId}`);
 
     let userId = customData.userId;
 
@@ -473,6 +519,7 @@ const handleSubscriptionActivated = async (data) => {
       isTrial: false,
       trialDays: 0,
       firstPaymentDate: new Date(data.startedAt || new Date()), // Track first payment for refund window
+      lastWebhookEventId: eventId, // Store event ID for idempotency
     };
 
     // Initialize usage counters if they don't exist
@@ -495,12 +542,13 @@ const handleSubscriptionActivated = async (data) => {
   }
 };
 
-const handleSubscriptionUpdated = async (data) => {
+const handleSubscriptionUpdated = async (data, eventId = null) => {
   try {
     const user = await User.findOne({ "subscription.subscriptionId": data.id });
     if (user) {
       user.subscription.status = data.status;
       user.subscription.endDate = new Date(data.nextBilledAt);
+      if (eventId) user.subscription.lastWebhookEventId = eventId;
       await user.save();
     }
   } catch (error) {
@@ -508,7 +556,7 @@ const handleSubscriptionUpdated = async (data) => {
   }
 };
 
-const handleSubscriptionCancelled = async (data) => {
+const handleSubscriptionCancelled = async (data, eventId = null) => {
   try {
     const user = await User.findOne({ "subscription.subscriptionId": data.id });
     if (user) {
@@ -518,6 +566,7 @@ const handleSubscriptionCancelled = async (data) => {
           ? data.scheduledChange.effectiveFrom
           : new Date(),
       );
+      if (eventId) user.subscription.lastWebhookEventId = eventId;
       await user.save();
     }
   } catch (error) {
@@ -525,11 +574,12 @@ const handleSubscriptionCancelled = async (data) => {
   }
 };
 
-const handleSubscriptionPaused = async (data) => {
+const handleSubscriptionPaused = async (data, eventId = null) => {
   try {
     const user = await User.findOne({ "subscription.subscriptionId": data.id });
     if (user) {
       user.subscription.status = "paused";
+      if (eventId) user.subscription.lastWebhookEventId = eventId;
       await user.save();
       console.log(`⏸️ Subscription paused for user: ${user.email}`);
     }
@@ -539,7 +589,7 @@ const handleSubscriptionPaused = async (data) => {
 };
 
 // New webhook handlers for missing events
-const handleTransactionPaid = async (data) => {
+const handleTransactionPaid = async (data, eventId = null) => {
   try {
     console.log(`💰 Transaction paid: ${data.id}`);
     const customerId = data.customerId;
@@ -550,7 +600,10 @@ const handleTransactionPaid = async (data) => {
       });
       if (user) {
         console.log(`✅ Payment confirmed for user: ${user.email}`);
-        // Could add payment confirmation logic here if needed
+        if (eventId && user.subscription)
+          user.subscription.lastWebhookEventId = eventId;
+        await user.save();
+        // Could add payment confirmation logic here
       }
     }
   } catch (error) {
@@ -558,7 +611,7 @@ const handleTransactionPaid = async (data) => {
   }
 };
 
-const handleTransactionPaymentFailed = async (data) => {
+const handleTransactionPaymentFailed = async (data, eventId = null) => {
   try {
     console.log(`❌ Payment failed for transaction: ${data.id}`);
     const customerId = data.customerId;
@@ -569,6 +622,9 @@ const handleTransactionPaymentFailed = async (data) => {
       });
       if (user) {
         console.log(`⚠️ Payment failed for user: ${user.email}`);
+        if (eventId && user.subscription)
+          user.subscription.lastWebhookEventId = eventId;
+        await user.save();
         // Could add payment failure notification logic here
       }
     }
@@ -577,7 +633,7 @@ const handleTransactionPaymentFailed = async (data) => {
   }
 };
 
-const handleTransactionRefunded = async (data) => {
+const handleTransactionRefunded = async (data, eventId = null) => {
   try {
     console.log(`🔄 Transaction refunded: ${data.id}`);
     const customerId = data.customerId;
@@ -597,6 +653,7 @@ const handleTransactionRefunded = async (data) => {
         user.subscription.plan = "free";
         user.subscription.usageLimits = { links: 5, customDomains: 1 };
         user.subscription.endDate = new Date(); // Immediate access removal
+        if (eventId) user.subscription.lastWebhookEventId = eventId;
 
         await user.save();
         console.log(
@@ -609,11 +666,12 @@ const handleTransactionRefunded = async (data) => {
   }
 };
 
-const handleSubscriptionResumed = async (data) => {
+const handleSubscriptionResumed = async (data, eventId = null) => {
   try {
     const user = await User.findOne({ "subscription.subscriptionId": data.id });
     if (user) {
       user.subscription.status = "active";
+      if (eventId) user.subscription.lastWebhookEventId = eventId;
       await user.save();
       console.log(`▶️ Subscription resumed for user: ${user.email}`);
     }
@@ -622,11 +680,12 @@ const handleSubscriptionResumed = async (data) => {
   }
 };
 
-const handleSubscriptionPastDue = async (data) => {
+const handleSubscriptionPastDue = async (data, eventId = null) => {
   try {
     const user = await User.findOne({ "subscription.subscriptionId": data.id });
     if (user) {
       user.subscription.status = "past_due";
+      if (eventId) user.subscription.lastWebhookEventId = eventId;
       await user.save();
       console.log(`⚠️ Subscription past due for user: ${user.email}`);
       // Could add past due notification logic here
