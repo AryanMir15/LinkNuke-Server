@@ -105,57 +105,37 @@ const register = async (req, res) => {
 };
 
 const login = async (req, res) => {
-  console.log("🔍🔍🔍 [LOGIN] Login attempt received");
-  console.log("🔍🔍🔍 [LOGIN] Email provided:", req.body.email);
-
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      console.log("❌ [LOGIN] Missing email or password");
       return res
         .status(400)
         .json({ error: "Please provide email and password" });
     }
 
-    console.log("🔍🔍🔍 [LOGIN] Looking for user in database...");
     const user = await User.findOne({ email }).select("+password");
 
     if (!user) {
-      console.log("❌ [LOGIN] User not found in database");
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    console.log("✅ [LOGIN] User found:", {
-      id: user._id,
-      email: user.email,
-      isVerified: user.isVerified,
-      hasPassword: !!user.password,
-    });
-
     if (!user.isVerified) {
-      console.log("❌ [LOGIN] User not verified");
       return res
         .status(403)
         .json({ error: "Please verify your email before logging in." });
     }
 
-    console.log("🔍🔍🔍 [LOGIN] Comparing password...");
     const isPasswordCorrect = await user.comparePassword(password);
 
     if (!isPasswordCorrect) {
-      console.log("❌ [LOGIN] Password incorrect");
       return res
         .status(401)
         .json({ error: "Please provide valid credentials" });
     }
 
-    console.log("✅ [LOGIN] Password correct, creating JWT token");
-
     // Create JWT token
     const token = user.createJWT();
-
-    console.log("🔍🔍🔍 LOGIN: JWT token created successfully");
 
     res.status(200).json({
       success: true,

@@ -31,7 +31,6 @@ router.get(
     session: false,
   }),
   (req, res) => {
-    console.log("🔍🔍🔍 [CALLBACK] OAuth callback handler");
     try {
       const state = req.query.state
         ? JSON.parse(Buffer.from(req.query.state, "base64").toString())
@@ -42,10 +41,9 @@ router.get(
         state.redirectTo || ""
       }`;
 
-      console.log("🔄 [CALLBACK] Redirecting to:", redirectUrl);
       res.redirect(redirectUrl);
     } catch (err) {
-      console.error("❌ [CALLBACK] Google callback error:", err);
+      console.error("Google callback error:", err);
       res.redirect(
         `${process.env.CLIENT_URL}/login?error=authentication_failed`,
       );
