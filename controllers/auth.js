@@ -26,17 +26,25 @@ const { sendVerificationPin } = require("../utils/sendVerificationPin");
 
 // Google OAuth callback handler
 const googleAuthCallback = async (req, res) => {
+  console.log("🔍 [AUTH_CALLBACK] OAuth callback received");
+  console.log("🔍 [AUTH_CALLBACK] req.user exists:", !!req.user);
+
   try {
     if (!req.user) {
+      console.log(
+        "❌ [AUTH_CALLBACK] No req.user found, redirecting to login with error",
+      );
       return res.redirect("/login?error=oauth_failed");
     }
 
+    console.log("✅ [AUTH_CALLBACK] User found, creating JWT");
     const token = req.user.createJWT();
-    res.redirect(
-      `${process.env.CLIENT_URL}/oauth-success?token=${token}&userId=${req.user._id}`,
-    );
+    const redirectUrl = `${process.env.CLIENT_URL}/oauth-success?token=${token}&userId=${req.user._id}`;
+    console.log("🔄 [AUTH_CALLBACK] Redirecting to:", redirectUrl);
+
+    res.redirect(redirectUrl);
   } catch (error) {
-    console.error("Google OAuth error:", error);
+    console.error("❌ [AUTH_CALLBACK] Google OAuth error:", error);
     res.redirect("/login?error=oauth_failed");
   }
 };
