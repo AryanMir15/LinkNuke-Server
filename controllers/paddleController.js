@@ -144,6 +144,48 @@ const createCheckoutSession = async (req, res) => {
       });
     }
 
+    // IDEMPOTENCY CHECK: Check if we have a cached response for this key
+    if (idempotencyKey) {
+      try {
+        // Look for existing checkout session with this idempotency key
+        const existingUser = await User.findOne({
+          "subscription.idempotencyKey": idempotencyKey,
+        });
+
+        if (existingUser && existingUser.subscription.checkoutUrl) {
+          // Check if the cached checkout is still valid (15 minutes)
+          const checkoutTime = existingUser.subscription.checkoutCreatedAt;
+          const now = new Date();
+          const minutesSinceCheckout = (now - checkoutTime) / (1000 * 60);
+
+          if (minutesSinceCheckout < 15) {
+            console.log(
+              `⚡ Returning cached checkout for idempotency key: ${idempotencyKey}`,
+            );
+            return res.json({
+              checkoutUrl: existingUser.subscription.checkoutUrl,
+              transactionId: existingUser.subscription.transactionId,
+              cached: true,
+              minutesOld: Math.round(minutesSinceCheckout),
+            });
+          } else {
+            console.log(
+              `🕐 Cached checkout expired for idempotency key: ${idempotencyKey}`,
+            );
+            // Clear expired cache
+            if (existingUser.subscription) {
+              existingUser.subscription.idempotencyKey = null;
+              existingUser.subscription.checkoutUrl = null;
+              existingUser.subscription.checkoutCreatedAt = null;
+              await existingUser.save();
+            }
+          }
+        }
+      } catch (error) {
+        console.log("ℹ️ Checking idempotency cache:", error.message);
+      }
+    }
+
     // Use hosted checkout with customData for user identification
     const isSandbox = process.env.PADDLE_ENV === "sandbox";
     const baseUrl = isSandbox
@@ -177,10 +219,36 @@ const createCheckoutSession = async (req, res) => {
 
     console.log(`✅ Checkout URL created for ${product.name}`);
 
+    const checkoutUrl = hostedCheckoutUrl.toString();
+
+    // CACHE THE CHECKOUT RESPONSE FOR IDEMPOTENCY
+    if (idempotencyKey) {
+      try {
+        // Initialize subscription object if it doesn't exist
+        if (!user.subscription) {
+          user.subscription = {};
+        }
+
+        // Cache the checkout URL and idempotency key
+        user.subscription.idempotencyKey = idempotencyKey;
+        user.subscription.checkoutUrl = checkoutUrl;
+        user.subscription.checkoutCreatedAt = new Date();
+
+        await user.save();
+        console.log(
+          `💾 Cached checkout for idempotency key: ${idempotencyKey}`,
+        );
+      } catch (error) {
+        console.error("❌ Error caching checkout:", error.message);
+        // Don't fail the request if caching fails
+      }
+    }
+
     const response = {
-      checkoutUrl: hostedCheckoutUrl.toString(),
+      checkoutUrl: checkoutUrl,
       transactionId: null,
-      originalCheckoutUrl: hostedCheckoutUrl.toString(),
+      originalCheckoutUrl: checkoutUrl,
+      cached: false,
     };
 
     res.json(response);
