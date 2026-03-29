@@ -58,6 +58,7 @@ const corsOptions = {
     "Authorization",
     "paddle-signature",
     "paddle-version",
+    "Idempotency-Key", // Allow idempotency key header for payment requests
   ],
 };
 
